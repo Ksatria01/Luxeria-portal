@@ -8,12 +8,11 @@
 const BOT_ORIGIN = "http://serverku.lynzzofficial.com:2013";
 
 export default async function handler(req, res) {
-  const segments = Array.isArray(req.query.path)
-    ? req.query.path
-    : req.query.path
-    ? [req.query.path]
-    : [];
-  const targetUrl = `${BOT_ORIGIN}/api/${segments.join("/")}`;
+  // Ambil path apa adanya langsung dari URL request, jangan andalkan
+  // req.query.path (kadang nggak konsisten ke-parse tergantung runtime).
+  // req.url contoh: "/api/jadibot-list" atau "/api/jadibot-status/6281..."
+  const pathAfterApi = req.url.replace(/^\/api\/?/, "");
+  const targetUrl = `${BOT_ORIGIN}/api/${pathAfterApi}`;
 
   try {
     const upstream = await fetch(targetUrl, {
@@ -30,11 +29,14 @@ export default async function handler(req, res) {
       "Content-Type",
       upstream.headers.get("content-type") || "application/json"
     );
+    // Header debug kecil, aman diabaikan browser, cuma buat kita cek kalau perlu.
+    res.setHeader("x-luxeria-target", targetUrl);
     res.send(text);
   } catch (err) {
     res.status(502).json({
       error: "Gagal konek ke server bot dari proxy Vercel.",
+      target: targetUrl,
       detail: String(err),
     });
   }
-      }
+}
