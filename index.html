@@ -391,6 +391,7 @@ function toggleDrawer() {
   document.getElementById('overlay').classList.toggle('show');
 }
 
+/* ---------- Registrasi + pairing (POST /api/jadibot) ----------- */
 async function daftar() {
   const btn = document.getElementById("submitBtn");
   const numberInput = document.getElementById("number");
@@ -459,8 +460,13 @@ function startPolling(number) {
 async function loadList() {
   const box = document.getElementById("listBox");
   try {
-    const res = await fetch(`${API_BASE}/api/jadibot-list`);
-    const data = await res.json();
+    const res = await fetch(`${API_BASE}/api/jadibot-list`, { cache: "no-store" });
+    const raw = await res.text();
+    let data;
+    try { data = JSON.parse(raw); } catch {
+      box.innerHTML = `<div class="empty-state">Server balas bukan JSON (status ${res.status}).<br><span style="font-family:var(--font-mono);font-size:11px;opacity:.7;">${escapeHtml(raw.slice(0,180))}</span></div>`;
+      return;
+    }
     if (!Array.isArray(data) || data.length === 0) {
       box.innerHTML = `<div class="empty-state">Belum ada bot yang terdaftar.</div>`;
       return;
@@ -472,8 +478,12 @@ async function loadList() {
       </div>
     `).join("");
   } catch (e) {
-    box.innerHTML = `<div class="empty-state">Gagal ambil data dari server. Cek domain API_BASE.</div>`;
+    box.innerHTML = `<div class="empty-state">Fetch gagal total (biasanya diblokir browser).<br><span style="font-family:var(--font-mono);font-size:11px;opacity:.7;">${escapeHtml(String(e))}</span></div>`;
   }
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function maskNumber(n) {
