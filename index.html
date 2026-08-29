@@ -7,6 +7,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<!-- Firebase Authentication (Login Google + Email/Password) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<!-- EmailJS (kirim tiket ke email admin tanpa backend) -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   :root {
     --void: #06070b;
@@ -222,6 +227,48 @@
   footer { position: relative; z-index: 1; text-align: center; font-size: 11.5px; color: var(--muted-2); padding: 20px; font-family: var(--font-mono); }
   footer b { color: var(--muted); }
 
+  /* ---------- Login & Tiket ---------- */
+  .tab-switch { display: flex; background: rgba(0,0,0,0.3); border: 1px solid var(--edge); border-radius: 12px; padding: 4px; margin-bottom: 20px; }
+  .tab-switch button { flex: 1; padding: 9px; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 600; font-size: 13px; }
+  .tab-switch button.active { background: var(--panel-hi); color: var(--ink); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; animation: fadeIn 0.2s; }
+  .btn-google {
+    background: #fff; color: #1f1f1f; display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .btn-google svg { width: 18px; height: 18px; }
+  .divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: var(--muted-2); font-size: 12px; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--edge); }
+  textarea {
+    width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--edge);
+    background: rgba(0,0,0,0.35); color: #fff; font-size: 14px; outline: none; margin-bottom: 16px;
+    font-family: var(--font-body); resize: vertical; min-height: 110px;
+  }
+  textarea:focus { border-color: var(--signal); box-shadow: 0 0 0 3px rgba(0,217,163,0.15); }
+  select {
+    width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--edge);
+    background: rgba(0,0,0,0.35); color: #fff; font-size: 14px; outline: none; margin-bottom: 16px;
+    font-family: var(--font-body); appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23838d9c' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 16px center;
+  }
+  .auth-gate { text-align: center; padding: 10px 0 4px; }
+  .auth-gate svg { width: 40px; height: 40px; stroke: var(--muted); margin-bottom: 14px; }
+  .user-chip {
+    display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px;
+    background: var(--panel-hi); border: 1px solid var(--edge); margin-bottom: 6px;
+  }
+  .user-chip .avatar {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--signal-dim); color: var(--signal);
+    display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 13px;
+    font-weight: 700; flex-shrink: 0; overflow: hidden;
+  }
+  .user-chip .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .user-chip .uinfo { flex: 1; min-width: 0; }
+  .user-chip .uinfo b { display: block; font-size: 12.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-chip .uinfo span { display: block; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .logout-btn { background: none; border: none; color: var(--danger); font-size: 12px; font-weight: 700; cursor: pointer; padding: 6px; width: auto; flex-shrink: 0; }
+
   /* ---------- Responsif: tablet ---------- */
   @media (min-width: 700px) {
     header { padding: 18px 32px; }
@@ -284,8 +331,11 @@
     <a href="#" onclick="navigate('landing'); toggleDrawer();">🏠 Halaman Utama</a>
     <a href="#" onclick="navigate('register'); toggleDrawer();">📲 Daftar Jadibot</a>
     <a href="#" onclick="navigate('list'); toggleDrawer();">📡 Bot Aktif</a>
+    <a href="#" onclick="navigate('ticket'); toggleDrawer();">🎫 Kirim Tiket</a>
     <hr>
     <a href="#" onclick="navigate('admin'); toggleDrawer();">💬 Bantuan Admin</a>
+    <hr>
+    <div id="drawerAuthArea"></div>
   </div>
 
   <main>
@@ -343,6 +393,79 @@
       </div>
     </div>
 
+    <!-- LOGIN (Firebase: Google + Email/Password) -->
+    <div id="view-login" class="view">
+      <div class="card">
+        <div class="eyebrow">AKUN MEMBER</div>
+        <h1>Masuk ke Luxeria</h1>
+        <p class="sub">Login buat bisa kirim tiket ke admin.</p>
+
+        <button class="btn-google" onclick="loginGoogle()">
+          <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.63h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.87c2.27-2.09 3.58-5.17 3.58-8.81z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.07 7.94-2.92l-3.87-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.11A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.27 14.27a7.2 7.2 0 0 1 0-4.54v-3.1H1.27a12 12 0 0 0 0 10.75z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.94 1.19 15.24 0 12 0A12 12 0 0 0 1.27 6.63l4 3.1C6.22 6.86 8.87 4.75 12 4.75z"/></svg>
+          Lanjut dengan Google
+        </button>
+
+        <div class="divider">atau pakai email</div>
+
+        <div class="tab-switch">
+          <button id="tabMasukBtn" class="active" onclick="switchAuthTab('masuk')">Masuk</button>
+          <button id="tabDaftarBtn" onclick="switchAuthTab('daftar')">Daftar</button>
+        </div>
+
+        <div id="panelMasuk" class="tab-panel active">
+          <label for="li-email">Email</label>
+          <input id="li-email" type="email" placeholder="kamu@email.com" autocomplete="email" />
+          <label for="li-pass">Password</label>
+          <input id="li-pass" type="password" placeholder="••••••••" autocomplete="current-password" />
+          <button onclick="loginEmail()">Masuk</button>
+        </div>
+
+        <div id="panelDaftar" class="tab-panel">
+          <label for="rg-name">Nama</label>
+          <input id="rg-name" type="text" placeholder="Nama kamu" autocomplete="name" />
+          <label for="rg-email">Email</label>
+          <input id="rg-email" type="email" placeholder="kamu@email.com" autocomplete="email" />
+          <label for="rg-pass">Password</label>
+          <input id="rg-pass" type="password" placeholder="minimal 6 karakter" autocomplete="new-password" />
+          <button onclick="registerEmail()">Daftar</button>
+        </div>
+
+        <div id="authResult" class="result"></div>
+      </div>
+    </div>
+
+    <!-- TICKET (EmailJS: kirim pesan/kesan/request/kritik/laporan ke admin) -->
+    <div id="view-ticket" class="view">
+      <div class="card">
+        <div class="eyebrow">SALURAN MEMBER</div>
+        <h1>Kirim Tiket ke Admin</h1>
+        <p class="sub">Pesan, kesan, request fitur, kritik, atau laporan masalah — langsung masuk ke email admin.</p>
+
+        <div id="ticketGate" class="auth-gate" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <p class="sub" style="margin-bottom:16px;">Kamu harus login dulu buat kirim tiket.</p>
+          <button onclick="navigate('login')">Login Sekarang</button>
+        </div>
+
+        <form id="ticketForm" style="display:none;" onsubmit="return false;">
+          <label for="tk-category">Jenis Tiket</label>
+          <select id="tk-category">
+            <option value="Kesan & Pesan">💬 Kesan &amp; Pesan</option>
+            <option value="Request Fitur">✨ Request Fitur</option>
+            <option value="Kritik & Saran">📝 Kritik &amp; Saran</option>
+            <option value="Laporan Masalah">⚠️ Laporan Masalah</option>
+          </select>
+          <label for="tk-subject">Subjek</label>
+          <input id="tk-subject" type="text" placeholder="Ringkasan singkat" />
+          <label for="tk-message">Pesan</label>
+          <textarea id="tk-message" placeholder="Tulis detailnya di sini..."></textarea>
+          <button id="ticketSubmitBtn" onclick="submitTicket()">Kirim Tiket</button>
+        </form>
+
+        <div id="ticketResult" class="result"></div>
+      </div>
+    </div>
+
     <!-- ADMIN -->
     <div id="view-admin" class="view">
       <div class="card" style="text-align: center;">
@@ -375,6 +498,166 @@
    ========================================================================= */
 const API_BASE = "";
 
+/* =========================================================================
+   ISI DI SINI setelah setup Firebase & EmailJS (lihat panduan dari Claude).
+   ========================================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyAwbIHNg3tZuGDY81DIdN0rxQVlWwKv94c",
+  authDomain: "luxeria-b0t.firebaseapp.com",
+  projectId: "luxeria-b0t",
+  appId: "1:543218098412:web:642b84be5cf9a8f95d85c9",
+};
+const EMAILJS_PUBLIC_KEY = "fsvB9dwf6LKd4Ll1z";
+const EMAILJS_SERVICE_ID = "service_6rtazln";
+const EMAILJS_TEMPLATE_ID = "template_e1hluji";
+const ADMIN_EMAILS = "luxeriaporse@gmail.com, herorandomml0@gmail.com";
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+if (window.emailjs) emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+
+let currentUser = null;
+
+auth.onAuthStateChanged((user) => {
+  currentUser = user;
+  renderAuthArea();
+  renderTicketGate();
+});
+
+function renderAuthArea() {
+  const box = document.getElementById("drawerAuthArea");
+  if (!box) return;
+  if (currentUser) {
+    const initial = (currentUser.displayName || currentUser.email || "?")[0].toUpperCase();
+    box.innerHTML = `
+      <div class="user-chip">
+        <div class="avatar">${currentUser.photoURL ? `<img src="${currentUser.photoURL}">` : initial}</div>
+        <div class="uinfo">
+          <b>${currentUser.displayName || "Member"}</b>
+          <span>${currentUser.email || ""}</span>
+        </div>
+        <button class="logout-btn" onclick="logout()">Keluar</button>
+      </div>`;
+  } else {
+    box.innerHTML = `<a href="#" onclick="navigate('login'); toggleDrawer();">🔐 Masuk / Daftar</a>`;
+  }
+}
+
+function switchAuthTab(tab) {
+  document.getElementById("tabMasukBtn").classList.toggle("active", tab === "masuk");
+  document.getElementById("tabDaftarBtn").classList.toggle("active", tab === "daftar");
+  document.getElementById("panelMasuk").classList.toggle("active", tab === "masuk");
+  document.getElementById("panelDaftar").classList.toggle("active", tab === "daftar");
+  document.getElementById("authResult").className = "result";
+}
+
+function showAuthResult(type, msg) {
+  const el = document.getElementById("authResult");
+  el.className = `result show ${type}`;
+  el.textContent = msg;
+}
+
+async function loginGoogle() {
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+    navigate("landing");
+  } catch (e) {
+    showAuthResult("err", friendlyAuthError(e));
+  }
+}
+
+async function loginEmail() {
+  const email = document.getElementById("li-email").value.trim();
+  const pass = document.getElementById("li-pass").value;
+  if (!email || !pass) return showAuthResult("err", "Isi email dan password dulu ya.");
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+    navigate("landing");
+  } catch (e) {
+    showAuthResult("err", friendlyAuthError(e));
+  }
+}
+
+async function registerEmail() {
+  const name = document.getElementById("rg-name").value.trim();
+  const email = document.getElementById("rg-email").value.trim();
+  const pass = document.getElementById("rg-pass").value;
+  if (!name || !email || !pass) return showAuthResult("err", "Lengkapi semua kolom dulu ya.");
+  if (pass.length < 6) return showAuthResult("err", "Password minimal 6 karakter.");
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+    await cred.user.updateProfile({ displayName: name });
+    navigate("landing");
+  } catch (e) {
+    showAuthResult("err", friendlyAuthError(e));
+  }
+}
+
+function logout() {
+  auth.signOut();
+  navigate("landing");
+}
+
+function friendlyAuthError(e) {
+  const code = e && e.code || "";
+  if (code.includes("email-already-in-use")) return "Email ini sudah terdaftar, coba menu Masuk.";
+  if (code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("user-not-found")) return "Email atau password salah.";
+  if (code.includes("invalid-email")) return "Format email nggak valid.";
+  if (code.includes("popup-closed-by-user")) return "Login Google dibatalkan.";
+  if (code.includes("unauthorized-domain")) return "Domain ini belum diizinkan di pengaturan Firebase Auth.";
+  return "Gagal: " + (e.message || String(e));
+}
+
+/* ---------- Tiket ---------- */
+function renderTicketGate() {
+  const gate = document.getElementById("ticketGate");
+  const form = document.getElementById("ticketForm");
+  if (!gate || !form) return;
+  gate.style.display = currentUser ? "none" : "block";
+  form.style.display = currentUser ? "block" : "none";
+}
+
+async function submitTicket() {
+  if (!currentUser) return navigate("login");
+  const category = document.getElementById("tk-category").value;
+  const subject = document.getElementById("tk-subject").value.trim();
+  const message = document.getElementById("tk-message").value.trim();
+  const resultEl = document.getElementById("ticketResult");
+  const btn = document.getElementById("ticketSubmitBtn");
+
+  if (!subject || !message) {
+    resultEl.className = "result show err";
+    resultEl.textContent = "Isi subjek dan pesannya dulu ya.";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Mengirim…";
+  resultEl.className = "result";
+
+  try {
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email: ADMIN_EMAILS,
+      from_name: currentUser.displayName || "Member",
+      from_email: currentUser.email || "-",
+      category,
+      subject,
+      message,
+    });
+    resultEl.className = "result show ok";
+    resultEl.textContent = "Tiket terkirim! Admin bakal cek secepatnya.";
+    document.getElementById("tk-subject").value = "";
+    document.getElementById("tk-message").value = "";
+  } catch (e) {
+    resultEl.className = "result show err";
+    resultEl.textContent = "Gagal kirim tiket: " + (e && e.text ? e.text : String(e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Kirim Tiket";
+  }
+}
+
 let pollTimer = null;
 let listTimer = null;
 
@@ -391,7 +674,7 @@ function toggleDrawer() {
   document.getElementById('overlay').classList.toggle('show');
 }
 
-/* ---------- Registrasi + pairing (POST /api/jadibot) ----------- */
+/* ---------- Registrasi + pairing (POST /api/jadibot) ---------- */
 async function daftar() {
   const btn = document.getElementById("submitBtn");
   const numberInput = document.getElementById("number");
