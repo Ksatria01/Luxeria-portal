@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Luxeria Bot — Portal Jadibot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #06070b;
+    --void-2: #0a0d14;
+    --panel: rgba(255,255,255,0.035);
+    --panel-hi: rgba(255,255,255,0.06);
+    --edge: rgba(255,255,255,0.08);
+    --signal: #00d9a3;      /* mint — status "terhubung" */
+    --signal-dim: rgba(0,217,163,0.15);
+    --pulse: #ffb020;       /* amber — status "menunggu" */
+    --pulse-dim: rgba(255,176,32,0.15);
+    --danger: #ff5c72;
+    --danger-dim: rgba(255,92,114,0.14);
+    --violet: #8b6bff;      /* aksen brand, dipakai hemat */
+    --ink: #f2f4f8;
+    --muted: #838d9c;
+    --muted-2: #545d6b;
+    --font-display: 'Orbitron', sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    font-family: var(--font-body);
+    background: var(--void); color: var(--ink);
+    position: relative; overflow-x: hidden;
+  }
+
+  /* ---------- Latar belakang signature: grid sinyal + orbs ---------- */
+  .bg-layer { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .bg-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 20%, #000 30%, transparent 85%);
+  }
+  .bg-orb {
+    position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.35;
+    animation: drift 22s ease-in-out infinite;
+  }
+  .orb-1 { width: 380px; height: 380px; background: var(--signal); top: -120px; left: -100px; }
+  .orb-2 { width: 320px; height: 320px; background: var(--violet); bottom: -140px; right: -80px; opacity: 0.22; animation-delay: -8s; }
+  .orb-3 { width: 240px; height: 240px; background: var(--pulse); top: 40%; right: 10%; opacity: 0.12; animation-delay: -14s; }
+  @keyframes drift {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    50% { transform: translate(30px,-24px) scale(1.08); }
+  }
+  .scanline {
+    position: absolute; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,217,163,0.5), transparent);
+    animation: scan 6s linear infinite;
+  }
+  @keyframes scan { 0% { top: -5%; } 100% { top: 105%; } }
+  @media (prefers-reduced-motion: reduce) {
+    .bg-orb, .scanline, .pulse-dot, .node-glow { animation: none !important; }
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    width: 100%; padding: 14px 20px; display: flex; justify-content: space-between;
+    align-items: center; background: rgba(6,7,11,0.72); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--edge); position: fixed; top: 0; z-index: 50;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--signal), #00a884);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 18px rgba(0,217,163,0.35);
+  }
+  .brand-mark svg { width: 18px; height: 18px; }
+  .brand-text { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: 1.5px; line-height: 1.1; }
+  .brand-text span { display: block; font-family: var(--font-body); font-weight: 500; font-size: 10px; letter-spacing: 2.5px; color: var(--muted); }
+  .menu-btn {
+    background: var(--panel); border: 1px solid var(--edge); color: #fff;
+    width: 38px; height: 38px; border-radius: 9px; cursor: pointer; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .menu-btn:active { background: var(--panel-hi); }
+
+  /* ---------- Drawer ---------- */
+  .drawer {
+    position: fixed; top: 0; right: -290px; width: 280px; height: 100%;
+    background: rgba(9,11,17,0.97); backdrop-filter: blur(18px);
+    border-left: 1px solid var(--edge); z-index: 100; padding: 22px;
+    display: flex; flex-direction: column; gap: 6px; box-shadow: -20px 0 40px rgba(0,0,0,0.5);
+    transition: right 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+  .drawer.open { right: 0; }
+  .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .drawer-header b { font-family: var(--font-display); font-size: 13px; letter-spacing: 1px; color: var(--muted); }
+  .drawer a {
+    color: var(--muted); text-decoration: none; padding: 12px 14px;
+    border-radius: 10px; font-weight: 500; font-size: 14px; display: flex; align-items: center; gap: 10px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .drawer a:active, .drawer a.active { background: var(--signal-dim); color: var(--signal); }
+  .drawer hr { border: 0; border-top: 1px solid var(--edge); margin: 8px 0; }
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 90; display: none;
+  }
+  .overlay.show { display: block; }
+
+  /* ---------- Layout ---------- */
+  main { position: relative; z-index: 1; flex: 1; display: flex; align-items: center; justify-content: center; padding: 96px 18px 40px; }
+  .view { display: none; width: 100%; max-width: 460px; }
+  .view.active { display: block; animation: fadeIn 0.35s cubic-bezier(0.4,0,0.2,1); }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 20px; padding: 28px 24px; backdrop-filter: blur(16px);
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.6);
+  }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 2px; color: var(--signal);
+    text-transform: uppercase; margin: 0 0 10px; display: flex; align-items: center; gap: 8px;
+  }
+  .eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 8px var(--signal); }
+  h1 { font-family: var(--font-display); font-size: 21px; margin: 0 0 8px; font-weight: 700; letter-spacing: 0.3px; }
+  h1.big { font-size: 30px; line-height: 1.25; }
+  p.sub { color: var(--muted); margin: 0 0 22px; font-size: 14px; line-height: 1.6; }
+
+  /* ---------- Signature: linking pulse ---------- */
+  .link-viz {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    margin: 4px 0 26px;
+  }
+  .node {
+    width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    background: var(--panel-hi); border: 1px solid var(--edge); position: relative;
+  }
+  .node svg { width: 24px; height: 24px; stroke: var(--ink); }
+  .node-glow { position: absolute; inset: -6px; border-radius: 18px; border: 1px solid var(--signal-dim); animation: ringpulse 2.4s ease-out infinite; }
+  @keyframes ringpulse { 0% { opacity: 0.7; transform: scale(0.9); } 100% { opacity: 0; transform: scale(1.25); } }
+  .link-track { flex: 1; max-width: 90px; height: 2px; background: repeating-linear-gradient(90deg, var(--edge) 0 6px, transparent 6px 11px); position: relative; border-radius: 2px; }
+  .link-track.active { background: var(--signal); }
+  .pulse-dot { position: absolute; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--pulse); box-shadow: 0 0 10px var(--pulse); animation: travel 1.6s linear infinite; }
+  .link-track.active .pulse-dot { display: none; }
+  @keyframes travel { 0% { left: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { left: calc(100% - 8px); opacity: 0; } }
+
+  /* ---------- Forms ---------- */
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 7px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; }
+  input {
+    width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--edge);
+    background: rgba(0,0,0,0.35); color: #fff; font-size: 15px; outline: none; margin-bottom: 16px;
+    font-family: var(--font-mono);
+  }
+  input::placeholder { color: var(--muted-2); }
+  input:focus { border-color: var(--signal); box-shadow: 0 0 0 3px rgba(0,217,163,0.15); }
+
+  .btn-group { display: flex; flex-direction: column; gap: 10px; }
+  button, .btn-link {
+    width: 100%; padding: 14px; border-radius: 12px; border: none;
+    background: linear-gradient(135deg, var(--signal), #00b590); color: #04140f; font-size: 14px;
+    font-weight: 700; letter-spacing: 0.3px; cursor: pointer; text-align: center; text-decoration: none;
+    display: block; font-family: var(--font-body);
+  }
+  button:active { transform: translateY(1px); filter: brightness(0.96); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-secondary { background: var(--panel-hi); border: 1px solid var(--edge); color: var(--ink); }
+  .btn-wa { background: #25D366; color: #04140f; }
+
+  /* steps (urutan nyata → boleh dinomori) */
+  .steps { list-style: none; margin: 0 0 22px; padding: 0; counter-reset: step; }
+  .steps li { counter-increment: step; display: flex; gap: 12px; padding: 10px 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+  .steps li::before {
+    content: counter(step); flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px;
+    background: var(--signal-dim); color: var(--signal); font-family: var(--font-mono); font-weight: 700;
+    font-size: 12px; display: flex; align-items: center; justify-content: center;
+  }
+  .steps b { color: var(--ink); }
+
+  /* ---------- Result / status ---------- */
+  .result { margin-top: 18px; padding: 16px; border-radius: 14px; display: none; font-size: 13.5px; line-height: 1.6; }
+  .result.show { display: block; animation: fadeIn 0.25s; }
+  .result.ok { background: var(--signal-dim); border: 1px solid rgba(0,217,163,0.3); color: #6ff0cd; }
+  .result.err { background: var(--danger-dim); border: 1px solid rgba(255,92,114,0.3); color: #ff8a9a; }
+  .code {
+    font-family: var(--font-display); font-size: 30px; font-weight: 800; letter-spacing: 7px;
+    text-align: center; margin: 14px 0; color: var(--ink);
+    background: rgba(0,0,0,0.35); border: 1px dashed rgba(0,217,163,0.4); border-radius: 12px; padding: 14px 8px;
+  }
+  .status { font-size: 12.5px; color: var(--muted); margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 7px; font-family: var(--font-mono); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .dot.on { background: var(--signal); box-shadow: 0 0 8px var(--signal); }
+  .dot.off { background: var(--pulse); box-shadow: 0 0 8px var(--pulse); animation: blink 1.4s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: 0.35; } }
+
+  /* ---------- List (bot aktif — data nyata dari API) ---------- */
+  .bot-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 13px 14px; border-radius: 12px; background: var(--panel-hi); border: 1px solid var(--edge);
+    margin-bottom: 8px; font-family: var(--font-mono); font-size: 13px;
+  }
+  .bot-row .num { color: var(--ink); }
+  .bot-row .prio { color: var(--muted-2); font-size: 11px; margin-left: 6px; }
+  .bot-row .badge {
+    font-size: 10.5px; padding: 4px 9px; border-radius: 999px; font-family: var(--font-body); font-weight: 700; letter-spacing: 0.3px;
+  }
+  .badge.on { background: var(--signal-dim); color: var(--signal); }
+  .badge.off { background: var(--pulse-dim); color: var(--pulse); }
+  .empty-state { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 10px; }
+  .refresh-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .refresh-row .live { font-family: var(--font-mono); font-size: 11px; color: var(--signal); display: flex; align-items: center; gap: 6px; }
+  .refresh-row .live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--signal); animation: blink 1.4s ease-in-out infinite; }
+
+  footer { position: relative; z-index: 1; text-align: center; font-size: 11.5px; color: var(--muted-2); padding: 20px; font-family: var(--font-mono); }
+  footer b { color: var(--muted); }
+
+  /* ---------- Responsif: tablet ---------- */
+  @media (min-width: 700px) {
+    header { padding: 18px 32px; }
+    .brand-text { font-size: 17px; }
+    main { padding: 108px 32px 56px; }
+    .view { max-width: 560px; }
+    .card { padding: 40px 40px; border-radius: 24px; }
+    h1.big { font-size: 36px; }
+    .code { font-size: 36px; letter-spacing: 9px; }
+    .node { width: 60px; height: 60px; }
+    .link-track { max-width: 120px; }
+  }
+
+  /* ---------- Responsif: laptop / desktop ---------- */
+  @media (min-width: 1100px) {
+    main { padding: 120px 32px 64px; align-items: flex-start; }
+    main::before { content: ''; }
+    .view { max-width: 620px; margin-top: 24px; }
+    .card { padding: 48px 52px; }
+    h1.big { font-size: 42px; }
+    p.sub { font-size: 15px; }
+    .steps li { font-size: 14.5px; }
+    .drawer { width: 320px; }
+    body { background-attachment: fixed; }
+    .bg-grid { background-size: 56px 56px; }
+  }
+
+  /* ---------- Responsif: layar lebar (desktop besar) ---------- */
+  @media (min-width: 1500px) {
+    .view { max-width: 680px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="bg-layer">
+    <div class="bg-grid"></div>
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+    <div class="scanline"></div>
+  </div>
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#04140f" stroke-width="2.4" stroke-linecap="round"><path d="M4 12h4M16 12h4M10 12h4"/><circle cx="8" cy="12" r="1.4" fill="#04140f"/><circle cx="16" cy="12" r="1.4" fill="#04140f"/></svg>
+      </div>
+      <div class="brand-text">LUXERIA<span>WHATSAPP AUTOMATION</span></div>
+    </div>
+    <button class="menu-btn" onclick="toggleDrawer()">☰</button>
+  </header>
+
+  <div class="overlay" id="overlay" onclick="toggleDrawer()"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <b>NAVIGASI</b>
+      <button class="menu-btn" onclick="toggleDrawer()">✕</button>
+    </div>
+    <a href="#" onclick="navigate('landing'); toggleDrawer();">🏠 Halaman Utama</a>
+    <a href="#" onclick="navigate('register'); toggleDrawer();">📲 Daftar Jadibot</a>
+    <a href="#" onclick="navigate('list'); toggleDrawer();">📡 Bot Aktif</a>
+    <hr>
+    <a href="#" onclick="navigate('admin'); toggleDrawer();">💬 Bantuan Admin</a>
+  </div>
+
+  <main>
+
+    <!-- LANDING -->
+    <div id="view-landing" class="view active">
+      <div class="card" style="text-align:center;">
+        <div class="eyebrow" style="justify-content:center;">SISTEM PAIRING AKTIF</div>
+        <div class="link-viz">
+          <div class="node"><div class="node-glow"></div><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="6" y="2" width="12" height="20" rx="2.5"/><line x1="10" y1="19" x2="14" y2="19"/></svg></div>
+          <div class="link-track"><span class="pulse-dot"></span></div>
+          <div class="node"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M4 12h4M16 12h4M10 12h4"/><circle cx="8" cy="12" r="1.4"/><circle cx="16" cy="12" r="1.4"/></svg></div>
+        </div>
+        <h1 class="big">Ubah nomormu jadi bot WhatsApp</h1>
+        <p class="sub">Tempel nomor, dapat kode pairing, tautkan di WhatsApp. Bot langsung aktif dan terhubung ke server Luxeria.</p>
+        <div class="btn-group">
+          <button onclick="navigate('register')">Daftarkan Nomor</button>
+          <button class="btn-secondary" onclick="navigate('list')">Lihat Bot yang Sudah Aktif</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- REGISTER (terhubung ke POST /api/jadibot + polling status) -->
+    <div id="view-register" class="view">
+      <div class="card">
+        <div class="eyebrow">LANGKAH PAIRING</div>
+        <h1>Registrasi Bot</h1>
+        <p class="sub">Masukkan nomor WhatsApp yang mau dijadikan bot.</p>
+
+        <ol class="steps">
+          <li><b>Kirim nomor</b> — format 62xxxxxxxxxx, tanpa tanda + atau spasi.</li>
+          <li><b>Ambil kode</b> — kode pairing 8 digit akan muncul di bawah.</li>
+          <li><b>Tautkan</b> — buka WhatsApp &gt; Perangkat Tertaut &gt; Tautkan dengan nomor telepon, masukkan kodenya.</li>
+        </ol>
+
+        <label for="number">Nomor WhatsApp</label>
+        <input id="number" type="tel" placeholder="628123456789" autocomplete="off" inputmode="numeric" />
+        <button id="submitBtn" onclick="daftar()">Daftarkan &amp; Ambil Kode</button>
+
+        <div id="result" class="result"></div>
+      </div>
+    </div>
+
+    <!-- LIST (terhubung ke GET /api/jadibot-list — data nyata, auto refresh) -->
+    <div id="view-list" class="view">
+      <div class="card">
+        <div class="eyebrow">DATA LANGSUNG DARI SERVER</div>
+        <h1>Bot Aktif</h1>
+        <p class="sub">Daftar semua nomor yang sudah terdaftar sebagai jadibot, urut berdasarkan prioritas.</p>
+        <div class="refresh-row">
+          <span class="live">live · update tiap 5 detik</span>
+          <button class="btn-secondary" style="width:auto; padding:8px 12px; font-size:12px;" onclick="loadList()">↻</button>
+        </div>
+        <div id="listBox"><div class="empty-state">Memuat data…</div></div>
+      </div>
+    </div>
+
+    <!-- ADMIN -->
+    <div id="view-admin" class="view">
+      <div class="card" style="text-align: center;">
+        <div class="eyebrow" style="justify-content:center;">DUKUNGAN</div>
+        <h1>Butuh Bantuan?</h1>
+        <p class="sub">Ada kendala teknis waktu pairing atau bot gak nyambung? Hubungi admin langsung.</p>
+        <a href="https://wa.me/628123456789?text=Halo%20Admin,%20saya%20butuh%20bantuan%20Jadibot" target="_blank" class="btn-link btn-wa">
+          Chat Admin via WhatsApp
+        </a>
+        <button class="btn-secondary" style="margin-top:10px;" onclick="navigate('landing')">Kembali</button>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <b>Luxeria Bot</b> · kode pairing dimasukkan di WhatsApp → Perangkat Tertaut → Tautkan dengan nomor telepon
+  </footer>
+
+<script>
+/* =========================================================================
+   API_BASE dikosongkan (relative path) SENGAJA.
+   Portal ini di-hosting di Vercel pakai HTTPS, sedangkan server bot masih
+   HTTP biasa di port 2013 — browser akan BLOKIR request https→http
+   (mixed content). Solusinya: fetch di sini manggil "/api/..." di domain
+   Vercel sendiri, lalu diteruskan ke server bot lewat serverless function
+   proxy di file api/[...path].js (taruh di folder /api project Vercel-mu).
+   Kalau nanti server bot sudah punya domain+SSL sendiri, API_BASE bisa
+   diisi langsung ke situ dan file proxy-nya boleh dihapus.
+   ========================================================================= */
+const API_BASE = "";
+
+let pollTimer = null;
+let listTimer = null;
+
+function navigate(viewName) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(`view-${viewName}`)?.classList.add('active');
+  document.querySelectorAll('.drawer a').forEach(a => a.classList.remove('active'));
+  if (listTimer) { clearInterval(listTimer); listTimer = null; }
+  if (viewName === 'list') { loadList(); listTimer = setInterval(loadList, 5000); }
+}
+
+function toggleDrawer() {
+  document.getElementById('drawer').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
+}
+
+async function daftar() {
+  const btn = document.getElementById("submitBtn");
+  const numberInput = document.getElementById("number");
+  const resultEl = document.getElementById("result");
+  const number = numberInput.value.replace(/\D/g, "");
+
+  if (!number || number.length < 9) {
+    showResult("err", "Masukkan nomor yang valid dulu ya (contoh: 628123456789).");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Memproses…";
+  resultEl.className = "result";
+
+  try {
+    const res = await fetch(`${API_BASE}/api/jadibot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ number }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showResult("err", data.error || "Gagal daftar, coba lagi.");
+    } else if (data.alreadyRegistered) {
+      showResult("ok",
+        `Nomor ini sudah terdaftar jadi jadibot (prioritas #${data.priority}).<br>` +
+        `<div class="status">${statusLine(data.connected)}</div>`
+      );
+      if (!data.connected) startPolling(number);
+    } else {
+      showResult("ok",
+        `Kode pairing kamu:<div class="code">${data.code}</div>` +
+        `Buka WhatsApp di nomor <b>${data.number}</b> → Perangkat Tertaut → Tautkan dengan nomor telepon, lalu masukkan kode di atas dalam beberapa detik.` +
+        `<div id="statusLine" class="status">${statusLine(false)}</div>`
+      );
+      startPolling(number);
+    }
+  } catch (e) {
+    showResult("err", "Gagal konek ke server bot. Cek lagi domain/port di API_BASE.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Daftarkan & Ambil Kode";
+  }
+}
+
+function statusLine(connected) {
+  return `<span class="dot ${connected ? "on" : "off"}"></span>${connected ? "Terhubung ke WhatsApp" : "Menunggu kamu masukkan kode…"}`;
+}
+
+function startPolling(number) {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/jadibot-status/${number}`);
+      const data = await res.json();
+      const line = document.getElementById("statusLine");
+      if (line) line.innerHTML = statusLine(data.connected);
+      if (data.connected) clearInterval(pollTimer);
+    } catch {}
+  }, 4000);
+}
+
+/* ---------- Daftar bot aktif (GET /api/jadibot-list) ---------- */
+async function loadList() {
+  const box = document.getElementById("listBox");
+  try {
+    const res = await fetch(`${API_BASE}/api/jadibot-list`);
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      box.innerHTML = `<div class="empty-state">Belum ada bot yang terdaftar.</div>`;
+      return;
+    }
+    box.innerHTML = data.map(j => `
+      <div class="bot-row">
+        <span class="num">${maskNumber(j.number)}<span class="prio">#${j.priority}</span></span>
+        <span class="badge ${j.connected ? 'on' : 'off'}">${j.connected ? 'TERHUBUNG' : 'MENUNGGU'}</span>
+      </div>
+    `).join("");
+  } catch (e) {
+    box.innerHTML = `<div class="empty-state">Gagal ambil data dari server. Cek domain API_BASE.</div>`;
+  }
+}
+
+function maskNumber(n) {
+  n = String(n);
+  return n.length > 6 ? n.slice(0, 4) + "••••" + n.slice(-3) : n;
+}
+
+function showResult(type, html) {
+  const el = document.getElementById("result");
+  el.className = `result show ${type}`;
+  el.innerHTML = html;
+}
+</script>
+</body>
+</html>
