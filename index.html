@@ -364,6 +364,11 @@
 </head>
 <body>
 
+  <div id="authLoading" style="position:fixed; inset:0; z-index:999; background:var(--void); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px;">
+    <div style="width:34px; height:34px; border-radius:10px; overflow:hidden;"><img src="/logo-icon.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div>
+    <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted); letter-spacing:1px;">MEMERIKSA AKUN...</span>
+  </div>
+
   <div class="bg-layer">
     <div class="bg-grid"></div>
     <div class="bg-orb orb-1"></div>
@@ -389,6 +394,7 @@
       <button class="menu-btn" onclick="toggleDrawer()">✕</button>
     </div>
     <a href="/" onclick="event.preventDefault(); navigate('landing'); toggleDrawer();">🏠 Halaman Utama</a>
+    <a href="/dashboard" onclick="event.preventDefault(); navigate('dashboard'); toggleDrawer();">🧭 Dashboard</a>
     <a href="/#fitur" onclick="event.preventDefault(); goToSection('fitur'); toggleDrawer();">✨ Fitur</a>
     <a href="/#faq" onclick="event.preventDefault(); goToSection('faq'); toggleDrawer();">❓ FAQ</a>
     <hr>
@@ -407,7 +413,7 @@
   <main>
 
     <!-- LANDING -->
-    <div id="view-landing" class="view active">
+    <div id="view-landing" class="view">
       <div class="card" style="text-align:center;">
         <div class="eyebrow" style="justify-content:center;">SISTEM PAIRING AKTIF</div>
         <div class="link-viz">
@@ -418,7 +424,7 @@
         <h1 class="big">Ubah nomormu jadi bot WhatsApp</h1>
         <p class="sub">Tempel nomor, dapat kode pairing, tautkan di WhatsApp. Bot langsung aktif dan terhubung ke server Luxeria.</p>
         <div class="btn-group">
-          <button onclick="navigate('register')">Daftarkan Nomor</button>
+          <button onclick="navigate('dashboard')">Mulai Sekarang</button>
           <button class="btn-secondary" onclick="navigate('list')">Lihat Bot yang Sudah Aktif</button>
         </div>
       </div>
@@ -588,6 +594,45 @@
       </div>
     </div>
 
+    <!-- DASHBOARD (hub setelah login, kayak zekais.id) -->
+    <div id="view-dashboard" class="view">
+      <div class="card">
+        <div class="eyebrow">MEMBER AREA</div>
+        <h1 id="dashHello">Halo 👋</h1>
+        <p class="sub">Mau ngapain hari ini?</p>
+
+        <div class="stats-grid" id="dashStats" style="grid-template-columns: repeat(4,1fr); margin-bottom:20px;"></div>
+
+        <div class="section-head" style="margin:0 0 12px; text-align:left;">
+          <div class="eyebrow">JADIBOT SAYA</div>
+        </div>
+        <div id="myBotsBox" style="margin-bottom: 20px;"></div>
+
+        <div class="feature-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="feat-box" style="cursor:pointer;" onclick="navigate('register')">
+            <div class="fic">📲</div><h3>Daftar Jadibot</h3><p>Ubah nomor jadi bot baru</p>
+          </div>
+          <div class="feat-box" style="cursor:pointer;" onclick="navigate('manage')">
+            <div class="fic">⚙️</div><h3>Kelola Bot</h3><p>Atur anticall, mode, dll</p>
+          </div>
+          <div class="feat-box" style="cursor:pointer;" onclick="navigate('ticket')">
+            <div class="fic">🎫</div><h3>Kirim Tiket</h3><p>Kesan, kritik, laporan</p>
+          </div>
+          <div class="feat-box" style="cursor:pointer;" onclick="navigate('chat')">
+            <div class="fic">💬</div><h3>Chat Admin</h3><p>Ngobrol langsung</p>
+          </div>
+        </div>
+
+        <div id="dashAdminCard" style="display:none; margin-top:12px;">
+          <div class="feat-box" style="cursor:pointer; border-color: var(--signal);" onclick="navigate('adminpanel')">
+            <div class="fic">🛠️</div><h3>Admin Panel</h3><p>Kelola semua chat member</p>
+          </div>
+        </div>
+
+        <button class="btn-secondary" style="margin-top:16px;" onclick="navigate('list')">Lihat Bot Aktif (publik)</button>
+      </div>
+    </div>
+
     <!-- KELOLA BOT (setting asli: anticall, autoread, autoblock, mode privasi, self mode) -->
     <div id="view-manage" class="view">
       <div class="card">
@@ -751,6 +796,8 @@ if (window.emailjs) emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
 
 let currentUser = null;
 let chatUnsub = null;
+let pendingRedirect = null;
+let authResolved = false;
 
 auth.onAuthStateChanged((user) => {
   currentUser = user;
@@ -760,6 +807,12 @@ auth.onAuthStateChanged((user) => {
   renderChatGate();
   renderAdminMenu();
   renderAdminPanelGate();
+
+  if (!authResolved) {
+    authResolved = true;
+    document.getElementById("authLoading")?.remove();
+    navigate(pathToView(location.pathname), { pushState: false });
+  }
 });
 
 function renderAuthArea() {
@@ -803,11 +856,18 @@ function showAuthResult(type, msg) {
   el.textContent = msg;
 }
 
+function goAfterAuth() {
+  currentUser = auth.currentUser; // pastikan langsung ke-update, gak nunggu listener async
+  const target = pendingRedirect || "dashboard";
+  pendingRedirect = null;
+  navigate(target);
+}
+
 async function loginGoogle() {
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     await auth.signInWithPopup(provider);
-    navigate("landing");
+    goAfterAuth();
   } catch (e) {
     showAuthResult("err", friendlyAuthError(e));
   }
@@ -819,7 +879,7 @@ async function loginEmail() {
   if (!email || !pass) return showAuthResult("err", "Isi email dan password dulu ya.");
   try {
     await auth.signInWithEmailAndPassword(email, pass);
-    navigate("landing");
+    goAfterAuth();
   } catch (e) {
     showAuthResult("err", friendlyAuthError(e));
   }
@@ -834,7 +894,7 @@ async function registerEmail() {
   try {
     const cred = await auth.createUserWithEmailAndPassword(email, pass);
     await cred.user.updateProfile({ displayName: name });
-    navigate("landing");
+    goAfterAuth();
   } catch (e) {
     showAuthResult("err", friendlyAuthError(e));
   }
@@ -906,6 +966,77 @@ async function submitTicket() {
 
 let pollTimer = null;
 let listTimer = null;
+
+/* ==========================================================================
+   Kepemilikan bot per akun — disimpan di Firestore users/{uid}/bots/{number}
+   biar Dashboard bisa nunjukin "Jadibot Saya" beneran, bukan dummy.
+   ========================================================================== */
+async function linkBotToAccount(number) {
+  if (!currentUser) return;
+  try {
+    await dbFire.collection("users").doc(currentUser.uid).collection("bots").doc(number).set({
+      number,
+      addedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  } catch (e) { /* diam-diam gagal gak masalah, bukan fitur kritikal */ }
+}
+
+async function loadMyBots() {
+  const box = document.getElementById("myBotsBox");
+  const statsBox = document.getElementById("dashStats");
+  if (!currentUser || !box) return;
+  box.innerHTML = `<div class="empty-state">Memuat bot kamu…</div>`;
+
+  try {
+    const snap = await dbFire.collection("users").doc(currentUser.uid).collection("bots").get();
+    const numbers = snap.docs.map((d) => d.id);
+
+    if (numbers.length === 0) {
+      box.innerHTML = `<div class="empty-state">Belum ada bot yang kamu daftarkan lewat akun ini.</div>`;
+      statsBox.innerHTML = statCard(0, "JADIBOT SAYA") + statCard(0, "ONLINE") + statCard(0, "MODE PUBLIC") + statCard(0, "MODE SELF");
+      return;
+    }
+
+    const results = await Promise.all(numbers.map(async (num) => {
+      const [statusRes, settingsRes] = await Promise.all([
+        fetch(`${API_BASE}/api/jadibot-status/${num}`).then((r) => r.json()).catch(() => ({})),
+        fetch(`${API_BASE}/api/jadibot-settings/${num}`).then((r) => r.json()).catch(() => ({})),
+      ]);
+      return { number: num, connected: !!statusRes.connected, settings: settingsRes.settings || {} };
+    }));
+
+    const online = results.filter((r) => r.connected).length;
+    const modePublic = results.filter((r) => !r.settings.selfMode).length;
+    const modeSelf = results.filter((r) => r.settings.selfMode).length;
+
+    statsBox.innerHTML =
+      statCard(results.length, "JADIBOT SAYA") +
+      statCard(online, "ONLINE") +
+      statCard(modePublic, "MODE PUBLIC") +
+      statCard(modeSelf, "MODE SELF");
+
+    box.innerHTML = results.map((r) => `
+      <div class="bot-row" style="cursor:pointer;" onclick="goManageNumber('${r.number}')">
+        <span class="num">${r.connected ? "🟢" : "🔴"} ${maskNumber(r.number)}</span>
+        <span class="badge ${r.connected ? 'on' : 'off'}">${r.connected ? 'ONLINE' : 'OFFLINE'}</span>
+      </div>
+    `).join("");
+  } catch (e) {
+    box.innerHTML = `<div class="empty-state">Gagal muat data bot kamu.</div>`;
+  }
+}
+
+function statCard(num, label) {
+  return `<div class="stat-box" style="padding:14px 8px;"><div class="num" style="font-size:20px;">${num}</div><div class="lbl" style="font-size:9.5px;">${label}</div></div>`;
+}
+
+function goManageNumber(number) {
+  navigate("manage");
+  setTimeout(() => {
+    const input = document.getElementById("mg-number");
+    if (input) { input.value = number; loadBotSettings(); }
+  }, 80);
+}
 
 /* ==========================================================================
    KELOLA BOT — baca/ubah setting asli bot (anticall, private, self, dll)
@@ -1110,6 +1241,7 @@ async function sendAdminReply() {
 
 const VIEW_PATHS = {
   landing: "/",
+  dashboard: "/dashboard",
   register: "/daftar-jadibot",
   list: "/bot-aktif",
   manage: "/kelola-bot",
@@ -1120,17 +1252,32 @@ const VIEW_PATHS = {
   admin: "/bantuan-admin",
 };
 
+// Halaman yang WAJIB login. Publik: landing, list (Bot Aktif), login, admin (bantuan/FAQ).
+const PROTECTED_VIEWS = ["dashboard", "register", "manage", "ticket", "chat", "adminpanel"];
+
 function pathToView(pathname) {
   const found = Object.entries(VIEW_PATHS).find(([, p]) => p === pathname);
   return found ? found[0] : "landing";
 }
 
 function navigate(viewName, opts = {}) {
+  // Gerbang login: kalau halaman ini wajib login dan belum ada yang login,
+  // paksa ke halaman Login dulu (bukan ditampilin kartu "harus login" doang).
+  if (PROTECTED_VIEWS.includes(viewName) && !currentUser) {
+    pendingRedirect = viewName;
+    viewName = "login";
+  }
+
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(`view-${viewName}`)?.classList.add('active');
   document.querySelectorAll('.drawer a').forEach(a => a.classList.remove('active'));
   if (listTimer) { clearInterval(listTimer); listTimer = null; }
   if (viewName === 'list') { loadList(); listTimer = setInterval(loadList, 5000); }
+  if (viewName === 'dashboard') {
+    document.getElementById('dashHello').textContent = `Halo, ${currentUser?.displayName || 'Member'} 👋`;
+    document.getElementById('dashAdminCard').style.display = isAdminUser(currentUser) ? 'block' : 'none';
+    loadMyBots();
+  }
 
   const path = VIEW_PATHS[viewName] || "/";
   if (opts.pushState !== false && location.pathname !== path) {
@@ -1143,9 +1290,6 @@ window.addEventListener("popstate", (e) => {
   const viewName = (e.state && e.state.view) || pathToView(location.pathname);
   navigate(viewName, { pushState: false });
 });
-
-// Tampilkan view yang sesuai kalau orang buka URL langsung (mis. /kirim-tiket)
-navigate(pathToView(location.pathname), { pushState: false });
 
 function toggleDrawer() {
   document.getElementById('drawer').classList.toggle('open');
@@ -1216,6 +1360,7 @@ async function daftar() {
         `<div class="status">${statusLine(data.connected)}</div>`
       );
       if (!data.connected) startPolling(number);
+      linkBotToAccount(number);
     } else {
       showResult("ok",
         `Kode pairing kamu:<div class="code">${data.code}</div>` +
@@ -1223,6 +1368,7 @@ async function daftar() {
         `<div id="statusLine" class="status">${statusLine(false)}</div>`
       );
       startPolling(number);
+      linkBotToAccount(number);
     }
   } catch (e) {
     showResult("err", "Gagal konek ke server bot. Cek lagi domain/port di API_BASE.");
