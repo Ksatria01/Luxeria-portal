@@ -300,6 +300,31 @@
   @media (min-width: 1500px) {
     .view { max-width: 680px; }
   }
+
+  /* ---------- Landing page lebar (stats/fitur/FAQ) ---------- */
+  #view-landing { max-width: 900px; }
+  .section-head { text-align: center; margin: 40px 0 18px; }
+  .section-head .eyebrow { justify-content: center; }
+  .section-head h2 { font-family: var(--font-display); font-size: 19px; margin: 0; }
+  .stats-grid, .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  @media (min-width: 640px) { .feature-grid { grid-template-columns: repeat(3, 1fr); } }
+  .stat-box, .feat-box {
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 16px; padding: 18px 16px;
+  }
+  .stat-box .num { font-family: var(--font-display); font-size: 24px; font-weight: 800; color: var(--signal); }
+  .stat-box .lbl { font-size: 11px; color: var(--muted); margin-top: 4px; letter-spacing: 0.3px; }
+  .stat-box .dot-live { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--signal); margin-right:5px; animation: blink 1.4s ease-in-out infinite; }
+  .feat-box .fic { width: 38px; height: 38px; border-radius: 10px; background: var(--signal-dim); display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 12px; }
+  .feat-box h3 { font-size: 14px; margin: 0 0 6px; color: var(--ink); }
+  .feat-box p { font-size: 12.5px; color: var(--muted); margin: 0; line-height: 1.55; }
+  .cmd-badge { text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--signal); margin-top: 6px; }
+  .faq-item { border: 1px solid var(--edge); border-radius: 12px; margin-bottom: 8px; overflow: hidden; background: var(--panel); }
+  .faq-q { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .faq-q .plus { color: var(--signal); font-family: var(--font-mono); transition: transform 0.2s; }
+  .faq-item.open .faq-q .plus { transform: rotate(45deg); }
+  .faq-a { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
+  .faq-item.open .faq-a { max-height: 200px; }
+  .faq-a p { margin: 0; padding: 0 16px 14px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -328,12 +353,15 @@
       <b>NAVIGASI</b>
       <button class="menu-btn" onclick="toggleDrawer()">✕</button>
     </div>
-    <a href="#" onclick="navigate('landing'); toggleDrawer();">🏠 Halaman Utama</a>
-    <a href="#" onclick="navigate('register'); toggleDrawer();">📲 Daftar Jadibot</a>
-    <a href="#" onclick="navigate('list'); toggleDrawer();">📡 Bot Aktif</a>
-    <a href="#" onclick="navigate('ticket'); toggleDrawer();">🎫 Kirim Tiket</a>
+    <a href="/" onclick="event.preventDefault(); navigate('landing'); toggleDrawer();">🏠 Halaman Utama</a>
+    <a href="/#fitur" onclick="event.preventDefault(); goToSection('fitur'); toggleDrawer();">✨ Fitur</a>
+    <a href="/#faq" onclick="event.preventDefault(); goToSection('faq'); toggleDrawer();">❓ FAQ</a>
     <hr>
-    <a href="#" onclick="navigate('admin'); toggleDrawer();">💬 Bantuan Admin</a>
+    <a href="/daftar-jadibot" onclick="event.preventDefault(); navigate('register'); toggleDrawer();">📲 Daftar Jadibot</a>
+    <a href="/bot-aktif" onclick="event.preventDefault(); navigate('list'); toggleDrawer();">📡 Bot Aktif</a>
+    <a href="/kirim-tiket" onclick="event.preventDefault(); navigate('ticket'); toggleDrawer();">🎫 Kirim Tiket</a>
+    <hr>
+    <a href="/bantuan-admin" onclick="event.preventDefault(); navigate('admin'); toggleDrawer();">💬 Bantuan Admin</a>
     <hr>
     <div id="drawerAuthArea"></div>
   </div>
@@ -354,6 +382,55 @@
         <div class="btn-group">
           <button onclick="navigate('register')">Daftarkan Nomor</button>
           <button class="btn-secondary" onclick="navigate('list')">Lihat Bot yang Sudah Aktif</button>
+        </div>
+      </div>
+
+      <!-- Live stats: data asli dari /api/jadibot-list -->
+      <div class="section-head">
+        <div class="eyebrow">STATISTIK LANGSUNG</div>
+        <h2>Dipakai beneran, bukan angka bohongan</h2>
+      </div>
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-box"><div class="num">…</div><div class="lbl">BOT TERDAFTAR</div></div>
+        <div class="stat-box"><div class="num">…</div><div class="lbl"><span class="dot-live"></span>BOT ONLINE</div></div>
+      </div>
+
+      <!-- Fitur (diambil dari command asli bot, bukan klaim ngasal) -->
+      <div class="section-head" id="fitur">
+        <div class="eyebrow">FITUR</div>
+        <h2>Satu bot, banyak kerjaan beres</h2>
+      </div>
+      <div class="feature-grid">
+        <div class="feat-box"><div class="fic">🧠</div><h3>AI Chat &amp; Gambar</h3><p>Ngobrol sama AI (Gemini) atau bikin gambar cuma dari teks. <span style="font-family:var(--font-mono);">.ai</span> / <span style="font-family:var(--font-mono);">.aiimg</span></p></div>
+        <div class="feat-box"><div class="fic">⬇️</div><h3>Downloader</h3><p>Unduh video/foto dari TikTok, YouTube, Instagram, Facebook, dan X — tinggal kirim link.</p></div>
+        <div class="feat-box"><div class="fic">🛡️</div><h3>Proteksi Grup</h3><p>Antilink, antifoto, antiaudio, antibot, sampai welcome/goodbye otomatis — semua bisa diatur admin grup.</p></div>
+        <div class="feat-box"><div class="fic">🌾</div><h3>Game Ekonomi &amp; Farm</h3><p>Sistem coin, level, leaderboard, sampai berkebun (Farm Land) lengkap dengan toko dan panen.</p></div>
+        <div class="feat-box"><div class="fic">🎨</div><h3>Sticker &amp; Quote Maker</h3><p>Ubah gambar/video jadi stiker, atau ubah obrolan jadi quote sticker sekali balas pesan.</p></div>
+        <div class="feat-box"><div class="fic">🎵</div><h3>Musik &amp; Lirik</h3><p>Cari dan unduh lagu dari YouTube, atau cari lirik lagu langsung dari chat.</p></div>
+      </div>
+      <div class="cmd-badge">+ 116 command lainnya, ketik <b>.menu</b> di bot buat lihat semua</div>
+
+      <!-- FAQ -->
+      <div class="section-head" id="faq">
+        <div class="eyebrow">FAQ</div>
+        <h2>Pertanyaan yang sering ditanyakan</h2>
+      </div>
+      <div id="faqList">
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)"><span>Apakah jadibot ini gratis?</span><span class="plus">[+]</span></div>
+          <div class="faq-a"><p>Ya, mengubah nomormu jadi bot lewat pairing code ini gratis, tanpa biaya daftar atau sewa bulanan.</p></div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)"><span>Apakah nomor saya aman dipakai jadi bot?</span><span class="plus">[+]</span></div>
+          <div class="faq-a"><p>Aman, kamu tetap bisa pakai WhatsApp seperti biasa di HP kamu. Bot cuma jadi "perangkat tertaut" tambahan, sama seperti WhatsApp Web.</p></div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)"><span>Kenapa bot saya tidak merespon?</span><span class="plus">[+]</span></div>
+          <div class="faq-a"><p>Cek dulu status koneksinya di halaman "Bot Aktif". Kalau statusnya menunggu/putus, coba daftar ulang buat dapat kode pairing baru.</p></div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)"><span>Saya nemu bug atau ada saran, ke mana kirimnya?</span><span class="plus">[+]</span></div>
+          <div class="faq-a"><p>Kirim lewat menu "Kirim Tiket" (perlu login dulu), atau chat langsung admin lewat gelembung chat di pojok kanan bawah.</p></div>
         </div>
       </div>
     </div>
@@ -471,11 +548,14 @@
       <div class="card" style="text-align: center;">
         <div class="eyebrow" style="justify-content:center;">DUKUNGAN</div>
         <h1>Butuh Bantuan?</h1>
-        <p class="sub">Ada kendala teknis waktu pairing atau bot gak nyambung? Hubungi admin langsung.</p>
-        <a href="https://wa.me/628123456789?text=Halo%20Admin,%20saya%20butuh%20bantuan%20Jadibot" target="_blank" class="btn-link btn-wa">
-          Chat Admin via WhatsApp
-        </a>
-        <button class="btn-secondary" style="margin-top:10px;" onclick="navigate('landing')">Kembali</button>
+        <p class="sub">Ada kendala teknis waktu pairing atau bot gak nyambung? Pilih cara paling cepat buat kamu.</p>
+        <div class="btn-group">
+          <button onclick="openLiveChat()">💬 Chat Langsung (Live Chat)</button>
+          <a href="https://wa.me/628123456789?text=Halo%20Admin,%20saya%20butuh%20bantuan%20Jadibot" target="_blank" class="btn-link btn-wa">
+            Chat Admin via WhatsApp
+          </a>
+          <button class="btn-secondary" onclick="goToSection('faq')">Lihat FAQ dulu</button>
+        </div>
       </div>
     </div>
 
@@ -539,7 +619,7 @@ function renderAuthArea() {
         <button class="logout-btn" onclick="logout()">Keluar</button>
       </div>`;
   } else {
-    box.innerHTML = `<a href="#" onclick="navigate('login'); toggleDrawer();">🔐 Masuk / Daftar</a>`;
+    box.innerHTML = `<a href="/login" onclick="event.preventDefault(); navigate('login'); toggleDrawer();">🔐 Masuk / Daftar</a>`;
   }
 }
 
@@ -661,18 +741,78 @@ async function submitTicket() {
 let pollTimer = null;
 let listTimer = null;
 
-function navigate(viewName) {
+const VIEW_PATHS = {
+  landing: "/",
+  register: "/daftar-jadibot",
+  list: "/bot-aktif",
+  ticket: "/kirim-tiket",
+  login: "/login",
+  admin: "/bantuan-admin",
+};
+
+function pathToView(pathname) {
+  const found = Object.entries(VIEW_PATHS).find(([, p]) => p === pathname);
+  return found ? found[0] : "landing";
+}
+
+function navigate(viewName, opts = {}) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(`view-${viewName}`)?.classList.add('active');
   document.querySelectorAll('.drawer a').forEach(a => a.classList.remove('active'));
   if (listTimer) { clearInterval(listTimer); listTimer = null; }
   if (viewName === 'list') { loadList(); listTimer = setInterval(loadList, 5000); }
+
+  const path = VIEW_PATHS[viewName] || "/";
+  if (opts.pushState !== false && location.pathname !== path) {
+    history.pushState({ view: viewName }, "", path);
+  }
+  window.scrollTo(0, 0);
 }
+
+window.addEventListener("popstate", (e) => {
+  const viewName = (e.state && e.state.view) || pathToView(location.pathname);
+  navigate(viewName, { pushState: false });
+});
+
+// Tampilkan view yang sesuai kalau orang buka URL langsung (mis. /kirim-tiket)
+navigate(pathToView(location.pathname), { pushState: false });
 
 function toggleDrawer() {
   document.getElementById('drawer').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('show');
 }
+
+function goToSection(id) {
+  navigate('landing');
+  setTimeout(() => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 60);
+}
+
+function toggleFaq(headerEl) {
+  headerEl.parentElement.classList.toggle('open');
+}
+
+async function loadLandingStats() {
+  const grid = document.getElementById('statsGrid');
+  if (!grid) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/jadibot-list`, { cache: 'no-store' });
+    const data = await res.json();
+    const total = Array.isArray(data) ? data.length : 0;
+    const online = Array.isArray(data) ? data.filter(j => j.connected).length : 0;
+    grid.innerHTML = `
+      <div class="stat-box"><div class="num">${total}</div><div class="lbl">BOT TERDAFTAR</div></div>
+      <div class="stat-box"><div class="num">${online}</div><div class="lbl"><span class="dot-live"></span>BOT ONLINE</div></div>
+    `;
+  } catch (e) {
+    grid.innerHTML = `
+      <div class="stat-box"><div class="num">-</div><div class="lbl">BOT TERDAFTAR</div></div>
+      <div class="stat-box"><div class="num">-</div><div class="lbl">BOT ONLINE</div></div>
+    `;
+  }
+}
+loadLandingStats();
 
 /* ---------- Registrasi + pairing (POST /api/jadibot) ---------- */
 async function daftar() {
@@ -779,6 +919,27 @@ function showResult(type, html) {
   el.className = `result show ${type}`;
   el.innerHTML = html;
 }
+</script>
+
+<!-- ==========================================================================
+     LIVE CHAT (Tawk.to) — widget gelembung chat pojok kanan bawah.
+     ISI setelah bikin akun di tawk.to (lihat panduan dari Claude):
+     GANTI_PROPERTY_ID dan GANTI_WIDGET_ID di baris "src" bawah ini.
+     ========================================================================== -->
+<script type="text/javascript">
+var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
+function openLiveChat() {
+  if (window.Tawk_API && Tawk_API.maximize) Tawk_API.maximize();
+}
+(function () {
+  var s1 = document.createElement("script"),
+      s0 = document.getElementsByTagName("script")[0];
+  s1.async = true;
+  s1.src = "https://embed.tawk.to/6a939d16cba9d4344640d807/default";
+  s1.charset = "UTF-8";
+  s1.setAttribute("crossorigin", "*");
+  s0.parentNode.insertBefore(s1, s0);
+})();
 </script>
 </body>
 </html>
