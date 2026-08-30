@@ -8,9 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-<!-- Firebase Authentication (Login Google + Email/Password) -->
+<!-- Firebase Authentication (Login Google + Email/Password) + Firestore (chat admin) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <!-- EmailJS (kirim tiket ke email admin tanpa backend) -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
@@ -326,6 +327,39 @@
   .faq-a { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
   .faq-item.open .faq-a { max-height: 200px; }
   .faq-a p { margin: 0; padding: 0 16px 14px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+
+  /* ---------- Kelola Bot (settings toggle) ---------- */
+  .setting-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 0; border-bottom: 1px solid var(--edge);
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-row .stxt b { display: block; font-size: 13.5px; color: var(--ink); margin-bottom: 2px; }
+  .setting-row .stxt span { font-size: 11.5px; color: var(--muted); }
+  .switch { position: relative; width: 44px; height: 25px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .track { position: absolute; inset: 0; background: var(--panel-hi); border: 1px solid var(--edge); border-radius: 999px; cursor: pointer; transition: 0.2s; }
+  .switch .track::before { content: ''; position: absolute; width: 19px; height: 19px; left: 2px; top: 2px; background: var(--muted); border-radius: 50%; transition: 0.2s; }
+  .switch input:checked + .track { background: var(--signal-dim); border-color: var(--signal); }
+  .switch input:checked + .track::before { transform: translateX(19px); background: var(--signal); }
+  .seg-group { display: flex; background: rgba(0,0,0,0.3); border: 1px solid var(--edge); border-radius: 12px; padding: 4px; margin: 6px 0 4px; }
+  .seg-group button { flex: 1; padding: 9px 4px; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 600; font-size: 11.5px; }
+  .seg-group button.active { background: var(--panel-hi); color: var(--ink); }
+
+  /* ---------- Chat Admin (Firestore, dua arah) ---------- */
+  .chat-box { display: flex; flex-direction: column; height: 380px; border: 1px solid var(--edge); border-radius: 14px; background: rgba(0,0,0,0.25); overflow: hidden; }
+  .chat-msgs { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .chat-bubble { max-width: 78%; padding: 9px 13px; border-radius: 14px; font-size: 13px; line-height: 1.5; }
+  .chat-bubble.me { align-self: flex-end; background: var(--signal-dim); color: var(--ink); border-bottom-right-radius: 4px; }
+  .chat-bubble.them { align-self: flex-start; background: var(--panel-hi); color: var(--ink); border-bottom-left-radius: 4px; }
+  .chat-bubble .who { display:block; font-size:10px; color:var(--muted); margin-bottom:3px; font-weight:700; letter-spacing:0.3px; }
+  .chat-input-row { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--edge); }
+  .chat-input-row input { margin: 0; flex: 1; }
+  .chat-input-row button { width: auto; padding: 0 18px; }
+  .thread-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--panel-hi); border: 1px solid var(--edge); margin-bottom: 8px; cursor: pointer; }
+  .thread-row .tinfo { flex: 1; min-width: 0; }
+  .thread-row .tinfo b { display: block; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-row .tinfo span { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
@@ -360,10 +394,13 @@
     <hr>
     <a href="/daftar-jadibot" onclick="event.preventDefault(); navigate('register'); toggleDrawer();">📲 Daftar Jadibot</a>
     <a href="/bot-aktif" onclick="event.preventDefault(); navigate('list'); toggleDrawer();">📡 Bot Aktif</a>
+    <a href="/kelola-bot" onclick="event.preventDefault(); navigate('manage'); toggleDrawer();">⚙️ Kelola Bot</a>
     <a href="/kirim-tiket" onclick="event.preventDefault(); navigate('ticket'); toggleDrawer();">🎫 Kirim Tiket</a>
+    <a href="/chat-admin" onclick="event.preventDefault(); navigate('chat'); toggleDrawer();">💬 Chat Admin</a>
     <hr>
-    <a href="/bantuan-admin" onclick="event.preventDefault(); navigate('admin'); toggleDrawer();">💬 Bantuan Admin</a>
+    <a href="/bantuan-admin" onclick="event.preventDefault(); navigate('admin'); toggleDrawer();">❓ Bantuan</a>
     <hr>
+    <div id="drawerAdminArea"></div>
     <div id="drawerAuthArea"></div>
   </div>
 
@@ -551,6 +588,109 @@
       </div>
     </div>
 
+    <!-- KELOLA BOT (setting asli: anticall, autoread, autoblock, mode privasi, self mode) -->
+    <div id="view-manage" class="view">
+      <div class="card">
+        <div class="eyebrow">PENGATURAN BOT KAMU</div>
+        <h1>Kelola Bot</h1>
+        <p class="sub">Sama persis kayak command <span style="font-family:var(--font-mono);">.anticall</span> / <span style="font-family:var(--font-mono);">.private</span> di WhatsApp — ubah di sini, langsung kepakai di bot.</p>
+
+        <div id="manageGate" class="auth-gate" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <p class="sub" style="margin-bottom:16px;">Login dulu buat kelola bot kamu.</p>
+          <button onclick="navigate('login')">Login Sekarang</button>
+        </div>
+
+        <div id="manageBody" style="display:none;">
+          <label for="mg-number">Nomor Bot Kamu</label>
+          <input id="mg-number" type="tel" placeholder="628123456789" inputmode="numeric" />
+          <button onclick="loadBotSettings()">Muat Pengaturan</button>
+
+          <div id="settingsPanel" style="display:none; margin-top: 18px;">
+            <div class="setting-row">
+              <div class="stxt"><b>Anticall</b><span>Tolak otomatis semua panggilan masuk</span></div>
+              <label class="switch"><input type="checkbox" id="set-anticall" onchange="saveBotSetting('anticall', this.checked)"><span class="track"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="stxt"><b>Auto-read</b><span>Baca otomatis semua pesan masuk</span></div>
+              <label class="switch"><input type="checkbox" id="set-autoread" onchange="saveBotSetting('autoread', this.checked)"><span class="track"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="stxt"><b>Auto-block Nomor Asing</b><span>Block otomatis chat pribadi dari bukan kontak</span></div>
+              <label class="switch"><input type="checkbox" id="set-autoblock" onchange="saveBotSetting('autoblockNonContact', this.checked)"><span class="track"></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="stxt"><b>Self Mode</b><span>Mode privat total, cuma bot ini sendiri yang bisa pakai</span></div>
+              <label class="switch"><input type="checkbox" id="set-selfmode" onchange="saveBotSetting('selfMode', this.checked)"><span class="track"></span></label>
+            </div>
+            <div style="padding-top:14px;">
+              <div class="stxt" style="margin-bottom:6px;"><b>Mode Privasi</b><span>Di mana bot ini boleh dipakai</span></div>
+              <div class="seg-group" id="privacySeg">
+                <button data-val="group" onclick="saveBotSetting('privacyMode','group', this)">Grup aja</button>
+                <button data-val="private" onclick="saveBotSetting('privacyMode','private', this)">Pribadi aja</button>
+                <button data-val="all" onclick="saveBotSetting('privacyMode','all', this)">Grup + Pribadi</button>
+              </div>
+            </div>
+          </div>
+          <div id="manageResult" class="result"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT ADMIN (Firestore, dua arah, ganti Tawk.to) -->
+    <div id="view-chat" class="view">
+      <div class="card">
+        <div class="eyebrow">CHAT LANGSUNG</div>
+        <h1>Chat Admin</h1>
+        <p class="sub">Ngobrol langsung, admin bakal bales dari sini juga.</p>
+
+        <div id="chatGate" class="auth-gate" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <p class="sub" style="margin-bottom:16px;">Login dulu buat mulai chat.</p>
+          <button onclick="navigate('login')">Login Sekarang</button>
+        </div>
+
+        <div id="chatBody" style="display:none;">
+          <div class="chat-box">
+            <div class="chat-msgs" id="chatMsgs"></div>
+            <div class="chat-input-row">
+              <input id="chatInput" type="text" placeholder="Tulis pesan..." onkeydown="if(event.key==='Enter') sendChatMessage()" />
+              <button onclick="sendChatMessage()">Kirim</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN PANEL (cuma muncul & bisa diakses kalau email login = ADMIN_EMAILS) -->
+    <div id="view-adminpanel" class="view">
+      <div class="card">
+        <div class="eyebrow">KHUSUS ADMIN</div>
+        <h1>Admin Panel</h1>
+        <p class="sub">Semua percakapan member masuk ke sini.</p>
+
+        <div id="adminGate" class="auth-gate" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+          <p class="sub" style="margin-bottom:16px;">Akses ditolak — halaman ini cuma buat akun admin.</p>
+          <button onclick="navigate('landing')">Kembali</button>
+        </div>
+
+        <div id="adminBody" style="display:none;">
+          <div id="threadList"></div>
+          <div id="adminChatArea" style="display:none; margin-top:14px;">
+            <button class="btn-secondary" style="width:auto; padding:8px 12px; font-size:12px; margin-bottom:10px;" onclick="closeAdminThread()">← Balik ke daftar</button>
+            <div class="chat-box">
+              <div class="chat-msgs" id="adminMsgs"></div>
+              <div class="chat-input-row">
+                <input id="adminInput" type="text" placeholder="Balas member..." onkeydown="if(event.key==='Enter') sendAdminReply()" />
+                <button onclick="sendAdminReply()">Kirim</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ADMIN -->
     <div id="view-admin" class="view">
       <div class="card" style="text-align: center;">
@@ -558,7 +698,7 @@
         <h1>Butuh Bantuan?</h1>
         <p class="sub">Ada kendala teknis waktu pairing atau bot gak nyambung? Pilih cara paling cepat buat kamu.</p>
         <div class="btn-group">
-          <button onclick="openLiveChat()">💬 Chat Langsung (Live Chat)</button>
+          <button onclick="navigate('chat')">💬 Chat Langsung</button>
           <a href="https://wa.me/628123456789?text=Halo%20Admin,%20saya%20butuh%20bantuan%20Jadibot" target="_blank" class="btn-link btn-wa">
             Chat Admin via WhatsApp
           </a>
@@ -599,17 +739,27 @@ const EMAILJS_PUBLIC_KEY = "fsvB9dwf6LKd4Ll1z";
 const EMAILJS_SERVICE_ID = "service_6rtazln";
 const EMAILJS_TEMPLATE_ID = "template_e1hluji";
 const ADMIN_EMAILS = "luxeriaporse@gmail.com, herorandomml0@gmail.com";
+const ADMIN_EMAIL_LIST = ADMIN_EMAILS.split(",").map((e) => e.trim().toLowerCase());
+function isAdminUser(user) {
+  return !!user && !!user.email && ADMIN_EMAIL_LIST.includes(user.email.toLowerCase());
+}
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+const dbFire = firebase.firestore();
 if (window.emailjs) emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
 
 let currentUser = null;
+let chatUnsub = null;
 
 auth.onAuthStateChanged((user) => {
   currentUser = user;
   renderAuthArea();
   renderTicketGate();
+  renderManageGate();
+  renderChatGate();
+  renderAdminMenu();
+  renderAdminPanelGate();
 });
 
 function renderAuthArea() {
@@ -629,6 +779,14 @@ function renderAuthArea() {
   } else {
     box.innerHTML = `<a href="/login" onclick="event.preventDefault(); navigate('login'); toggleDrawer();">🔐 Masuk / Daftar</a>`;
   }
+}
+
+function renderAdminMenu() {
+  const box = document.getElementById("drawerAdminArea");
+  if (!box) return;
+  box.innerHTML = isAdminUser(currentUser)
+    ? `<a href="/admin-panel" onclick="event.preventDefault(); navigate('adminpanel'); toggleDrawer();">🛠️ Admin Panel</a><hr>`
+    : "";
 }
 
 function switchAuthTab(tab) {
@@ -749,11 +907,215 @@ async function submitTicket() {
 let pollTimer = null;
 let listTimer = null;
 
+/* ==========================================================================
+   KELOLA BOT — baca/ubah setting asli bot (anticall, private, self, dll)
+   lewat /api/jadibot-settings/:number, sama data sama command di WhatsApp.
+   ========================================================================== */
+function renderManageGate() {
+  const gate = document.getElementById("manageGate");
+  const body = document.getElementById("manageBody");
+  if (!gate || !body) return;
+  gate.style.display = currentUser ? "none" : "block";
+  body.style.display = currentUser ? "block" : "none";
+}
+
+async function loadBotSettings() {
+  const number = document.getElementById("mg-number").value.replace(/\D/g, "");
+  const resultEl = document.getElementById("manageResult");
+  const panel = document.getElementById("settingsPanel");
+  resultEl.className = "result";
+  panel.style.display = "none";
+  if (!number) return showManageResult("err", "Isi nomor bot kamu dulu ya.");
+
+  try {
+    const res = await fetch(`${API_BASE}/api/jadibot-settings/${number}`, { cache: "no-store" });
+    const data = await res.json();
+    if (!res.ok) return showManageResult("err", data.error || "Gagal ambil pengaturan.");
+
+    const s = data.settings;
+    document.getElementById("set-anticall").checked = !!s.anticall;
+    document.getElementById("set-autoread").checked = !!s.autoread;
+    document.getElementById("set-autoblock").checked = !!s.autoblockNonContact;
+    document.getElementById("set-selfmode").checked = !!s.selfMode;
+    document.querySelectorAll("#privacySeg button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.val === s.privacyMode);
+    });
+    panel.style.display = "block";
+    panel.dataset.number = number;
+  } catch (e) {
+    showManageResult("err", "Gagal konek ke server: " + String(e));
+  }
+}
+
+async function saveBotSetting(key, value, btnEl) {
+  const panel = document.getElementById("settingsPanel");
+  const number = panel.dataset.number;
+  if (!number) return;
+
+  if (btnEl) {
+    document.querySelectorAll("#privacySeg button").forEach((b) => b.classList.remove("active"));
+    btnEl.classList.add("active");
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/jadibot-settings/${number}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [key]: value }),
+    });
+    const data = await res.json();
+    if (!res.ok) return showManageResult("err", data.error || "Gagal simpan.");
+    showManageResult("ok", "Tersimpan ✓");
+  } catch (e) {
+    showManageResult("err", "Gagal konek ke server: " + String(e));
+  }
+}
+
+function showManageResult(type, msg) {
+  const el = document.getElementById("manageResult");
+  el.className = `result show ${type}`;
+  el.textContent = msg;
+  if (type === "ok") setTimeout(() => { el.className = "result"; }, 2000);
+}
+
+/* ==========================================================================
+   CHAT ADMIN — dua arah, pakai Firestore.
+   Struktur data: koleksi "chats", 1 dokumen per member (id = UID),
+   subkoleksi "messages" isi {sender:'member'|'admin', text, ts}.
+   ========================================================================== */
+function renderChatGate() {
+  const gate = document.getElementById("chatGate");
+  const body = document.getElementById("chatBody");
+  if (!gate || !body) return;
+  gate.style.display = currentUser ? "none" : "block";
+  body.style.display = currentUser ? "block" : "none";
+  if (currentUser) startChatListener(currentUser.uid);
+}
+
+function startChatListener(chatId) {
+  if (chatUnsub) chatUnsub();
+  const msgsEl = document.getElementById("chatMsgs");
+  chatUnsub = dbFire.collection("chats").doc(chatId).collection("messages")
+    .orderBy("ts", "asc")
+    .onSnapshot((snap) => {
+      if (!msgsEl) return;
+      msgsEl.innerHTML = snap.docs.map((d) => {
+        const m = d.data();
+        return `<div class="chat-bubble ${m.sender === 'member' ? 'me' : 'them'}">${m.sender === 'admin' ? '<span class="who">ADMIN</span>' : ''}${escapeHtml(m.text)}</div>`;
+      }).join("");
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    });
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById("chatInput");
+  const text = input.value.trim();
+  if (!text || !currentUser) return;
+  input.value = "";
+
+  const chatRef = dbFire.collection("chats").doc(currentUser.uid);
+  await chatRef.set({
+    name: currentUser.displayName || "Member",
+    email: currentUser.email || "-",
+    lastMessage: text,
+    lastSender: "member",
+    lastTs: firebase.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await chatRef.collection("messages").add({
+    sender: "member",
+    text,
+    ts: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+/* ==========================================================================
+   ADMIN PANEL — cuma bisa diakses email yang ada di ADMIN_EMAIL_LIST.
+   ========================================================================== */
+let adminThreadsUnsub = null;
+let adminActiveChatId = null;
+let adminActiveMsgsUnsub = null;
+
+function renderAdminPanelGate() {
+  const gate = document.getElementById("adminGate");
+  const body = document.getElementById("adminBody");
+  if (!gate || !body) return;
+  const allowed = isAdminUser(currentUser);
+  gate.style.display = allowed ? "none" : "block";
+  body.style.display = allowed ? "block" : "none";
+  if (allowed) loadAdminThreads();
+}
+
+function loadAdminThreads() {
+  if (adminThreadsUnsub) adminThreadsUnsub();
+  const list = document.getElementById("threadList");
+  adminThreadsUnsub = dbFire.collection("chats").orderBy("lastTs", "desc")
+    .onSnapshot((snap) => {
+      if (snap.empty) {
+        list.innerHTML = `<div class="empty-state">Belum ada chat masuk.</div>`;
+        return;
+      }
+      list.innerHTML = snap.docs.map((d) => {
+        const c = d.data();
+        return `<div class="thread-row" onclick="openAdminThread('${d.id}','${escapeHtml(c.name || 'Member')}')">
+          <div class="tinfo"><b>${escapeHtml(c.name || 'Member')}</b><span>${c.lastSender === 'admin' ? 'Kamu: ' : ''}${escapeHtml(c.lastMessage || '')}</span></div>
+        </div>`;
+      }).join("");
+    });
+}
+
+function openAdminThread(chatId, name) {
+  adminActiveChatId = chatId;
+  document.getElementById("threadList").style.display = "none";
+  document.getElementById("adminChatArea").style.display = "block";
+
+  if (adminActiveMsgsUnsub) adminActiveMsgsUnsub();
+  const msgsEl = document.getElementById("adminMsgs");
+  adminActiveMsgsUnsub = dbFire.collection("chats").doc(chatId).collection("messages")
+    .orderBy("ts", "asc")
+    .onSnapshot((snap) => {
+      msgsEl.innerHTML = snap.docs.map((d) => {
+        const m = d.data();
+        return `<div class="chat-bubble ${m.sender === 'admin' ? 'me' : 'them'}">${m.sender === 'member' ? `<span class="who">${escapeHtml(name)}</span>` : ''}${escapeHtml(m.text)}</div>`;
+      }).join("");
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    });
+}
+
+function closeAdminThread() {
+  document.getElementById("threadList").style.display = "block";
+  document.getElementById("adminChatArea").style.display = "none";
+  if (adminActiveMsgsUnsub) adminActiveMsgsUnsub();
+  adminActiveChatId = null;
+}
+
+async function sendAdminReply() {
+  const input = document.getElementById("adminInput");
+  const text = input.value.trim();
+  if (!text || !adminActiveChatId) return;
+  input.value = "";
+
+  const chatRef = dbFire.collection("chats").doc(adminActiveChatId);
+  await chatRef.set({
+    lastMessage: text,
+    lastSender: "admin",
+    lastTs: firebase.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await chatRef.collection("messages").add({
+    sender: "admin",
+    text,
+    ts: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+
 const VIEW_PATHS = {
   landing: "/",
   register: "/daftar-jadibot",
   list: "/bot-aktif",
+  manage: "/kelola-bot",
   ticket: "/kirim-tiket",
+  chat: "/chat-admin",
+  adminpanel: "/admin-panel",
   login: "/login",
   admin: "/bantuan-admin",
 };
@@ -941,27 +1303,6 @@ function showResult(type, html) {
   el.className = `result show ${type}`;
   el.innerHTML = html;
 }
-</script>
-
-<!-- ==========================================================================
-     LIVE CHAT (Tawk.to) — widget gelembung chat pojok kanan bawah.
-     ISI setelah bikin akun di tawk.to (lihat panduan dari Claude):
-     GANTI_PROPERTY_ID dan GANTI_WIDGET_ID di baris "src" bawah ini.
-     ========================================================================== -->
-<script type="text/javascript">
-var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
-function openLiveChat() {
-  if (window.Tawk_API && Tawk_API.maximize) Tawk_API.maximize();
-}
-(function () {
-  var s1 = document.createElement("script"),
-      s0 = document.getElementsByTagName("script")[0];
-  s1.async = true;
-  s1.src = "https://embed.tawk.to/6a939d16cba9d4344640d807/default";
-  s1.charset = "UTF-8";
-  s1.setAttribute("crossorigin", "*");
-  s0.parentNode.insertBefore(s1, s0);
-})();
 </script>
 </body>
 </html>
