@@ -360,6 +360,35 @@
   .thread-row .tinfo { flex: 1; min-width: 0; }
   .thread-row .tinfo b { display: block; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .thread-row .tinfo span { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---------- Tiket (status badge) ---------- */
+  .tk-row { padding: 13px 14px; border-radius: 12px; background: var(--panel-hi); border: 1px solid var(--edge); margin-bottom: 8px; cursor: pointer; }
+  .tk-row .tk-top { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px; }
+  .tk-row .tk-code { font-family: var(--font-mono); font-size:11px; color: var(--signal); }
+  .tk-row .tk-cat { font-family: var(--font-mono); font-size:10px; color: var(--muted); margin-left:6px; }
+  .tk-row .tk-title { font-size: 13.5px; color: var(--ink); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tk-row .tk-date { font-size: 10.5px; color: var(--muted-2); margin-top:3px; }
+  .tk-status { font-size: 9.5px; font-weight:700; letter-spacing:0.4px; padding: 4px 9px; border-radius: 999px; white-space:nowrap; flex-shrink:0; }
+  .tk-status.aktif { background: var(--signal-dim); color: var(--signal); }
+  .tk-status.dipertimbangkan { background: rgba(181,68,255,0.15); color: var(--violet); }
+  .tk-status.selesai { background: var(--pulse-dim); color: var(--pulse); }
+  .tk-status.ditolak { background: var(--danger-dim); color: var(--danger); }
+
+  /* ---------- Terminal Log (Admin Panel) ---------- */
+  .log-box {
+    background: rgba(0,0,0,0.5); border: 1px solid var(--edge); border-radius: 12px;
+    padding: 12px; overflow-y: auto; font-family: var(--font-mono); font-size: 11.5px;
+    line-height: 1.7; color: var(--muted);
+  }
+  .log-line { white-space: pre-wrap; word-break: break-word; }
+  .log-line .lvl { display:inline-block; width:52px; font-weight:700; }
+  .log-line.CMD .lvl { color: #7dd3fc; }
+  .log-line.OK .lvl { color: var(--signal); }
+  .log-line.WARN .lvl { color: var(--pulse); }
+  .log-line.ERROR .lvl { color: var(--danger); }
+  .log-line.SPAM .lvl { color: var(--violet); }
+  .log-line.INFO .lvl { color: var(--muted); }
+  .log-line .t { color: var(--muted-2); margin-right: 6px; }
 </style>
 </head>
 <body>
@@ -562,35 +591,48 @@
       </div>
     </div>
 
-    <!-- TICKET (EmailJS: kirim pesan/kesan/request/kritik/laporan ke admin) -->
+    <!-- TICKET (Firestore, dua arah, ada kode tiket & status - kayak zekais.id) -->
     <div id="view-ticket" class="view">
-      <div class="card">
+      <div class="card" id="ticketListCard">
         <div class="eyebrow">SALURAN MEMBER</div>
-        <h1>Kirim Tiket ke Admin</h1>
-        <p class="sub">Pesan, kesan, request fitur, kritik, atau laporan masalah — langsung masuk ke email admin.</p>
+        <h1>Lapor &amp; Bantuan</h1>
+        <p class="sub">Ada yang error, punya ide fitur, saran, atau kritik? Kirim tiket ke admin. Maksimal 5 tiket aktif sekaligus.</p>
 
-        <div id="ticketGate" class="auth-gate" style="display:none;">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-          <p class="sub" style="margin-bottom:16px;">Kamu harus login dulu buat kirim tiket.</p>
-          <button onclick="navigate('login')">Login Sekarang</button>
+        <div style="margin-bottom:18px;">
+          <label for="tk-category">Kategori</label>
+          <select id="tk-category">
+            <option value="Kritik & Saran">Kritik &amp; Saran</option>
+            <option value="Request Fitur">Request Fitur</option>
+            <option value="Laporan Error">Laporan Error</option>
+            <option value="Pertanyaan / Lainnya">Pertanyaan / Lainnya</option>
+          </select>
+          <label for="tk-title">Judul</label>
+          <input id="tk-title" type="text" placeholder="Ringkasan singkat" maxlength="100" />
+          <label for="tk-detail">Detail</label>
+          <textarea id="tk-detail" placeholder="Jelasin detailnya di sini..." maxlength="2000"></textarea>
+          <button id="ticketSubmitBtn" onclick="submitTicket()">Kirim Laporan →</button>
+          <div id="ticketResult" class="result"></div>
         </div>
 
-        <form id="ticketForm" style="display:none;" onsubmit="return false;">
-          <label for="tk-category">Jenis Tiket</label>
-          <select id="tk-category">
-            <option value="Kesan & Pesan">💬 Kesan &amp; Pesan</option>
-            <option value="Request Fitur">✨ Request Fitur</option>
-            <option value="Kritik & Saran">📝 Kritik &amp; Saran</option>
-            <option value="Laporan Masalah">⚠️ Laporan Masalah</option>
-          </select>
-          <label for="tk-subject">Subjek</label>
-          <input id="tk-subject" type="text" placeholder="Ringkasan singkat" />
-          <label for="tk-message">Pesan</label>
-          <textarea id="tk-message" placeholder="Tulis detailnya di sini..."></textarea>
-          <button id="ticketSubmitBtn" onclick="submitTicket()">Kirim Tiket</button>
-        </form>
+        <div class="section-head" style="margin: 8px 0 12px; text-align:left;">
+          <div class="eyebrow">TIKET SAYA</div>
+        </div>
+        <div id="myTicketsBox"><div class="empty-state">Memuat tiket kamu…</div></div>
+      </div>
 
-        <div id="ticketResult" class="result"></div>
+      <!-- Detail 1 tiket (dibuka pas salah satu tiket di-tap) -->
+      <div class="card" id="ticketDetailCard" style="display:none;">
+        <button class="btn-secondary" style="width:auto; padding:8px 12px; font-size:12px; margin-bottom:14px;" onclick="closeTicketDetail()">← Kembali ke Lapor</button>
+        <div class="eyebrow" id="td-code">LAP-XXXXX</div>
+        <h1 id="td-title">Judul tiket</h1>
+        <p class="sub" id="td-meta">Kategori · Tanggal</p>
+        <div class="chat-box">
+          <div class="chat-msgs" id="ticketMsgs"></div>
+          <div class="chat-input-row">
+            <input id="ticketReplyInput" type="text" placeholder="Tulis balasan..." onkeydown="if(event.key==='Enter') sendTicketReply()" />
+            <button onclick="sendTicketReply()">Kirim</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -614,6 +656,9 @@
           </div>
           <div class="feat-box" style="cursor:pointer;" onclick="navigate('manage')">
             <div class="fic">⚙️</div><h3>Kelola Bot</h3><p>Atur anticall, mode, dll</p>
+          </div>
+          <div class="feat-box" style="cursor:pointer;" onclick="navigate('mystats')">
+            <div class="fic">💰</div><h3>Cek Akun Saya</h3><p>Coin, level, rank kamu</p>
           </div>
           <div class="feat-box" style="cursor:pointer;" onclick="navigate('ticket')">
             <div class="fic">🎫</div><h3>Kirim Tiket</h3><p>Kesan, kritik, laporan</p>
@@ -676,9 +721,39 @@
                 <button data-val="all" onclick="saveBotSetting('privacyMode','all', this)">Grup + Pribadi</button>
               </div>
             </div>
+            <div style="padding-top:18px; border-top:1px solid var(--edge); margin-top:6px;">
+              <div class="stxt" style="margin-bottom:8px;"><b>🔔 Notifikasi Bot Putus</b><span>Dapat email kalau bot ini tiba-tiba offline</span></div>
+              <input id="mg-notify-email" type="email" placeholder="email buat notifikasi (kosongkan buat matikan)" />
+              <button class="btn-secondary" onclick="saveNotifyEmail()">Simpan Email Notifikasi</button>
+            </div>
           </div>
           <div id="manageResult" class="result"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- CEK AKUN SAYA (coin/level/rank dari game ekonomi bot) -->
+    <div id="view-mystats" class="view">
+      <div class="card">
+        <div class="eyebrow">GAME EKONOMI BOT</div>
+        <h1>Cek Akun Saya</h1>
+        <p class="sub">Lihat coin, level, dan rank kamu di bot — data yang sama persis kayak command <span style="font-family:var(--font-mono);">.profile</span>.</p>
+
+        <label for="ms-number">Nomor WhatsApp Kamu</label>
+        <input id="ms-number" type="tel" placeholder="628123456789" inputmode="numeric" />
+        <button onclick="loadMyStats()">Cek Sekarang</button>
+
+        <div id="myStatsPanel" style="display:none; margin-top: 18px;">
+          <div class="stats-grid">
+            <div class="stat-box"><div class="num" id="ms-coin">0</div><div class="lbl">COIN</div></div>
+            <div class="stat-box"><div class="num" id="ms-level">1</div><div class="lbl">LEVEL</div></div>
+          </div>
+          <div class="stat-box" style="margin-top:10px; text-align:center;">
+            <div class="lbl" style="margin-bottom:6px;">RANK</div>
+            <div class="num" id="ms-rank" style="font-size:18px;">MEMBER</div>
+          </div>
+        </div>
+        <div id="myStatsResult" class="result"></div>
       </div>
     </div>
 
@@ -721,17 +796,66 @@
         </div>
 
         <div id="adminBody" style="display:none;">
-          <div id="threadList"></div>
-          <div id="adminChatArea" style="display:none; margin-top:14px;">
-            <button class="btn-secondary" style="width:auto; padding:8px 12px; font-size:12px; margin-bottom:10px;" onclick="closeAdminThread()">← Balik ke daftar</button>
-            <div class="chat-box">
-              <div class="chat-msgs" id="adminMsgs"></div>
-              <div class="chat-input-row">
-                <input id="adminInput" type="text" placeholder="Balas member..." onkeydown="if(event.key==='Enter') sendAdminReply()" />
-                <button onclick="sendAdminReply()">Kirim</button>
+          <div class="tab-switch">
+            <button id="adminTabChatBtn" class="active" onclick="switchAdminTab('chat')">💬 Chat (<span id="adminChatCount">0</span>)</button>
+            <button id="adminTabTicketBtn" onclick="switchAdminTab('ticket')">🎫 Tiket (<span id="adminTicketCount">0</span>)</button>
+            <button id="adminTabLogBtn" onclick="switchAdminTab('log')">📟 Log</button>
+          </div>
+
+          <div id="adminPanelChat" class="tab-panel active">
+            <div id="threadList"></div>
+            <div id="adminChatArea" style="display:none; margin-top:14px;">
+              <button class="btn-secondary" style="width:auto; padding:8px 12px; font-size:12px; margin-bottom:10px;" onclick="closeAdminThread()">← Balik ke daftar</button>
+              <div class="chat-box">
+                <div class="chat-msgs" id="adminMsgs"></div>
+                <div class="chat-input-row">
+                  <input id="adminInput" type="text" placeholder="Balas member..." onkeydown="if(event.key==='Enter') sendAdminReply()" />
+                  <button onclick="sendAdminReply()">Kirim</button>
+                </div>
               </div>
             </div>
           </div>
+
+          <div id="adminPanelTicket" class="tab-panel">
+            <div id="adminTicketList"></div>
+            <div id="adminTicketArea" style="display:none; margin-top:14px;">
+              <button class="btn-secondary" style="width:auto; padding:8px 12px; font-size:12px; margin-bottom:10px;" onclick="closeAdminTicket()">← Balik ke daftar</button>
+              <div class="eyebrow" id="atk-code">LAP-XXXXX</div>
+              <h1 style="font-size:16px;" id="atk-title">Judul</h1>
+              <p class="sub" id="atk-meta">Kategori</p>
+              <div class="seg-group" id="atk-status-seg">
+                <button data-val="aktif" onclick="setTicketStatus('aktif', this)">Aktif</button>
+                <button data-val="dipertimbangkan" onclick="setTicketStatus('dipertimbangkan', this)">Dipertimbangkan</button>
+                <button data-val="selesai" onclick="setTicketStatus('selesai', this)">Selesai</button>
+                <button data-val="ditolak" onclick="setTicketStatus('ditolak', this)">Ditolak</button>
+              </div>
+              <div class="chat-box" style="margin-top:12px;">
+                <div class="chat-msgs" id="atkMsgs"></div>
+                <div class="chat-input-row">
+                  <input id="atkInput" type="text" placeholder="Balas tiket..." onkeydown="if(event.key==='Enter') sendAdminTicketReply()" />
+                  <button onclick="sendAdminTicketReply()">Kirim</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="adminPanelLog" class="tab-panel">
+            <div class="refresh-row">
+              <span class="live" id="logLiveIndicator">live · polling tiap 2 detik</span>
+              <button class="btn-secondary" id="logPauseBtn" style="width:auto; padding:8px 12px; font-size:12px;" onclick="toggleLogPause()">⏸ Pause</button>
+            </div>
+            <div class="seg-group" id="logFilterSeg" style="flex-wrap:wrap; height:auto;">
+              <button data-val="ALL" class="active" onclick="setLogFilter('ALL', this)">ALL</button>
+              <button data-val="CMD" onclick="setLogFilter('CMD', this)">CMD</button>
+              <button data-val="OK" onclick="setLogFilter('OK', this)">OK</button>
+              <button data-val="WARN" onclick="setLogFilter('WARN', this)">WARN</button>
+              <button data-val="ERROR" onclick="setLogFilter('ERROR', this)">ERROR</button>
+              <button data-val="SPAM" onclick="setLogFilter('SPAM', this)">SPAM</button>
+              <button data-val="INFO" onclick="setLogFilter('INFO', this)">INFO</button>
+            </div>
+            <div class="log-box" id="logBox" style="height:340px; margin-top:10px;"></div>
+          </div>
+        </div>
         </div>
       </div>
     </div>
@@ -915,26 +1039,35 @@ function friendlyAuthError(e) {
   return "Gagal: " + (e.message || String(e));
 }
 
-/* ---------- Tiket ---------- */
+/* ==========================================================================
+   TIKET — Firestore, dua arah, ada kode & status (kayak zekais.id).
+   Koleksi "tickets", 1 dokumen per tiket (id = kode kayak "LAP-A8TXY"),
+   subkoleksi "replies" isi balasan gantian member/admin.
+   ========================================================================== */
 function renderTicketGate() {
-  const gate = document.getElementById("ticketGate");
-  const form = document.getElementById("ticketForm");
-  if (!gate || !form) return;
-  gate.style.display = currentUser ? "none" : "block";
-  form.style.display = currentUser ? "block" : "none";
+  if (currentUser) loadMyTickets();
 }
+
+function genTicketCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return `LAP-${code}`;
+}
+
+const TICKET_STATUS_LABEL = { aktif: "AKTIF", dipertimbangkan: "DIPERTIMBANGKAN", selesai: "SELESAI", ditolak: "DITOLAK" };
 
 async function submitTicket() {
   if (!currentUser) return navigate("login");
   const category = document.getElementById("tk-category").value;
-  const subject = document.getElementById("tk-subject").value.trim();
-  const message = document.getElementById("tk-message").value.trim();
+  const title = document.getElementById("tk-title").value.trim();
+  const detail = document.getElementById("tk-detail").value.trim();
   const resultEl = document.getElementById("ticketResult");
   const btn = document.getElementById("ticketSubmitBtn");
 
-  if (!subject || !message) {
+  if (!title || !detail) {
     resultEl.className = "result show err";
-    resultEl.textContent = "Isi subjek dan pesannya dulu ya.";
+    resultEl.textContent = "Isi judul dan detailnya dulu ya.";
     return;
   }
 
@@ -943,25 +1076,125 @@ async function submitTicket() {
   resultEl.className = "result";
 
   try {
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      to_email: ADMIN_EMAILS,
-      from_name: currentUser.displayName || "Member",
-      from_email: currentUser.email || "-",
+    const openSnap = await dbFire.collection("tickets")
+      .where("uid", "==", currentUser.uid)
+      .where("status", "in", ["aktif", "dipertimbangkan"])
+      .get();
+    if (openSnap.size >= 5) {
+      resultEl.className = "result show err";
+      resultEl.textContent = "Kamu udah punya 5 tiket aktif. Tunggu salah satu selesai dulu ya.";
+      return;
+    }
+
+    const code = genTicketCode();
+    await dbFire.collection("tickets").doc(code).set({
+      uid: currentUser.uid,
+      name: currentUser.displayName || "Member",
+      email: currentUser.email || "-",
       category,
-      subject,
-      message,
+      title,
+      status: "aktif",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    await dbFire.collection("tickets").doc(code).collection("replies").add({
+      sender: "member",
+      text: detail,
+      opening: true,
+      ts: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
     resultEl.className = "result show ok";
-    resultEl.textContent = "Tiket terkirim! Admin bakal cek secepatnya.";
-    document.getElementById("tk-subject").value = "";
-    document.getElementById("tk-message").value = "";
+    resultEl.textContent = `Tiket terkirim! Kode: ${code}`;
+    document.getElementById("tk-title").value = "";
+    document.getElementById("tk-detail").value = "";
+    loadMyTickets();
   } catch (e) {
     resultEl.className = "result show err";
-    resultEl.textContent = "Gagal kirim tiket: " + (e && e.text ? e.text : String(e));
+    resultEl.textContent = "Gagal kirim tiket: " + String(e);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Kirim Tiket";
+    btn.textContent = "Kirim Laporan →";
   }
+}
+
+let myTicketsUnsub = null;
+function loadMyTickets() {
+  const box = document.getElementById("myTicketsBox");
+  if (!box || !currentUser) return;
+  if (myTicketsUnsub) myTicketsUnsub();
+  myTicketsUnsub = dbFire.collection("tickets")
+    .where("uid", "==", currentUser.uid)
+    .orderBy("updatedAt", "desc")
+    .onSnapshot((snap) => {
+      if (snap.empty) {
+        box.innerHTML = `<div class="empty-state">Belum ada tiket.</div>`;
+        return;
+      }
+      box.innerHTML = snap.docs.map((d) => {
+        const t = d.data();
+        const date = t.updatedAt?.toDate ? t.updatedAt.toDate().toLocaleString("id-ID") : "-";
+        return `<div class="tk-row" onclick="openTicketDetail('${d.id}')">
+          <div class="tk-top">
+            <div><span class="tk-code">${d.id}</span><span class="tk-cat">${escapeHtml(t.category || "")}</span></div>
+            <span class="tk-status ${t.status}">${TICKET_STATUS_LABEL[t.status] || t.status}</span>
+          </div>
+          <div class="tk-title">${escapeHtml(t.title || "")}</div>
+          <div class="tk-date">diperbarui ${date}</div>
+        </div>`;
+      }).join("");
+    });
+}
+
+let activeTicketId = null;
+let ticketMsgsUnsub = null;
+
+function openTicketDetail(code) {
+  activeTicketId = code;
+  document.getElementById("ticketListCard").style.display = "none";
+  document.getElementById("ticketDetailCard").style.display = "block";
+  document.getElementById("td-code").textContent = code;
+
+  dbFire.collection("tickets").doc(code).get().then((doc) => {
+    const t = doc.data();
+    if (!t) return;
+    document.getElementById("td-title").textContent = t.title;
+    document.getElementById("td-meta").textContent = `${t.category} · ${TICKET_STATUS_LABEL[t.status] || t.status}`;
+  });
+
+  if (ticketMsgsUnsub) ticketMsgsUnsub();
+  const msgsEl = document.getElementById("ticketMsgs");
+  ticketMsgsUnsub = dbFire.collection("tickets").doc(code).collection("replies")
+    .orderBy("ts", "asc")
+    .onSnapshot((snap) => {
+      msgsEl.innerHTML = snap.docs.map((d) => {
+        const m = d.data();
+        return `<div class="chat-bubble ${m.sender === 'member' ? 'me' : 'them'}">${m.sender === 'admin' ? '<span class="who">ADMIN</span>' : (m.opening ? '<span class="who">PELAPOR · MEMBUKA TIKET</span>' : '')}${escapeHtml(m.text)}</div>`;
+      }).join("");
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    });
+}
+
+function closeTicketDetail() {
+  document.getElementById("ticketListCard").style.display = "block";
+  document.getElementById("ticketDetailCard").style.display = "none";
+  if (ticketMsgsUnsub) ticketMsgsUnsub();
+  activeTicketId = null;
+}
+
+async function sendTicketReply() {
+  const input = document.getElementById("ticketReplyInput");
+  const text = input.value.trim();
+  if (!text || !activeTicketId) return;
+  input.value = "";
+
+  const ref = dbFire.collection("tickets").doc(activeTicketId);
+  await ref.set({ updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  await ref.collection("replies").add({
+    sender: "member",
+    text,
+    ts: firebase.firestore.FieldValue.serverTimestamp(),
+  });
 }
 
 let pollTimer = null;
@@ -1068,6 +1301,7 @@ async function loadBotSettings() {
     document.getElementById("set-autoread").checked = !!s.autoread;
     document.getElementById("set-autoblock").checked = !!s.autoblockNonContact;
     document.getElementById("set-selfmode").checked = !!s.selfMode;
+    document.getElementById("mg-notify-email").value = s.notifyEmail || "";
     document.querySelectorAll("#privacySeg button").forEach((b) => {
       b.classList.toggle("active", b.dataset.val === s.privacyMode);
     });
@@ -1075,6 +1309,53 @@ async function loadBotSettings() {
     panel.dataset.number = number;
   } catch (e) {
     showManageResult("err", "Gagal konek ke server: " + String(e));
+  }
+}
+
+async function saveNotifyEmail() {
+  const panel = document.getElementById("settingsPanel");
+  const number = panel.dataset.number;
+  if (!number) return;
+  const email = document.getElementById("mg-notify-email").value.trim();
+
+  try {
+    const res = await fetch(`${API_BASE}/api/jadibot-settings/${number}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notifyEmail: email }),
+    });
+    const data = await res.json();
+    if (!res.ok) return showManageResult("err", data.error || "Gagal simpan.");
+    showManageResult("ok", email ? "Notifikasi diaktifkan ✓" : "Notifikasi dimatikan ✓");
+  } catch (e) {
+    showManageResult("err", "Gagal konek ke server: " + String(e));
+  }
+}
+
+/* ==========================================================================
+   CEK AKUN SAYA — coin/level/rank dari game ekonomi bot
+   ========================================================================== */
+async function loadMyStats() {
+  const number = document.getElementById("ms-number").value.replace(/\D/g, "");
+  const resultEl = document.getElementById("myStatsResult");
+  const panel = document.getElementById("myStatsPanel");
+  resultEl.className = "result";
+  panel.style.display = "none";
+  if (!number) { resultEl.className = "result show err"; resultEl.textContent = "Isi nomor kamu dulu ya."; return; }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/user-stats/${number}`, { cache: "no-store" });
+    const data = await res.json();
+    if (!res.ok) { resultEl.className = "result show err"; resultEl.textContent = data.error || "Gagal ambil data."; return; }
+
+    document.getElementById("ms-coin").textContent = data.coin;
+    document.getElementById("ms-level").textContent = data.level;
+    const rankLabels = { member: "MEMBER", vip: "✨ VIP", vvip: "💎 VVIP", legenda: "👑 LEGENDA" };
+    document.getElementById("ms-rank").textContent = rankLabels[data.rank] || data.rank.toUpperCase();
+    panel.style.display = "block";
+  } catch (e) {
+    resultEl.className = "result show err";
+    resultEl.textContent = "Gagal konek ke server: " + String(e);
   }
 }
 
@@ -1176,6 +1457,74 @@ function renderAdminPanelGate() {
   if (allowed) loadAdminThreads();
 }
 
+/* ---------- Switch tab dalam Admin Panel (Chat / Tiket / Log) ---------- */
+function switchAdminTab(tab) {
+  document.getElementById("adminTabChatBtn").classList.toggle("active", tab === "chat");
+  document.getElementById("adminTabTicketBtn").classList.toggle("active", tab === "ticket");
+  document.getElementById("adminTabLogBtn").classList.toggle("active", tab === "log");
+  document.getElementById("adminPanelChat").classList.toggle("active", tab === "chat");
+  document.getElementById("adminPanelTicket").classList.toggle("active", tab === "ticket");
+  document.getElementById("adminPanelLog").classList.toggle("active", tab === "log");
+
+  if (tab === "log") startLogPolling();
+  else stopLogPolling();
+}
+
+/* ---------- Terminal Log (polling tiap 2 detik, terasa live tanpa websocket) ---------- */
+let logTimer = null;
+let logPaused = false;
+let logFilter = "ALL";
+let logLastId = 0;
+let logEntries = [];
+
+function startLogPolling() {
+  if (logTimer) return;
+  fetchLogs();
+  logTimer = setInterval(() => { if (!logPaused) fetchLogs(); }, 2000);
+}
+
+function stopLogPolling() {
+  if (logTimer) { clearInterval(logTimer); logTimer = null; }
+}
+
+async function fetchLogs() {
+  try {
+    const res = await fetch(`${API_BASE}/api/logs?since=${logLastId}&level=ALL`, { cache: "no-store" });
+    const data = await res.json();
+    if (data.logs && data.logs.length) {
+      logEntries.push(...data.logs);
+      if (logEntries.length > 400) logEntries = logEntries.slice(-400);
+      logLastId = data.lastId;
+      renderLogs();
+    }
+  } catch (e) { /* diam, coba lagi di polling berikutnya */ }
+}
+
+function renderLogs() {
+  const box = document.getElementById("logBox");
+  if (!box) return;
+  const filtered = logFilter === "ALL" ? logEntries : logEntries.filter((l) => l.level === logFilter);
+  const wasAtBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  box.innerHTML = filtered.map((l) => {
+    const time = new Date(l.ts).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return `<div class="log-line ${l.level}"><span class="t">${time}</span><span class="lvl">[${l.level}]</span>${escapeHtml(l.botNumber ? l.botNumber + " " : "")}${escapeHtml(l.message)}</div>`;
+  }).join("") || `<div style="color:var(--muted-2);">belum ada log masuk...</div>`;
+  if (wasAtBottom) box.scrollTop = box.scrollHeight;
+}
+
+function setLogFilter(level, btnEl) {
+  logFilter = level;
+  document.querySelectorAll("#logFilterSeg button").forEach((b) => b.classList.remove("active"));
+  btnEl.classList.add("active");
+  renderLogs();
+}
+
+function toggleLogPause() {
+  logPaused = !logPaused;
+  document.getElementById("logPauseBtn").textContent = logPaused ? "▶ Resume" : "⏸ Pause";
+  document.getElementById("logLiveIndicator").textContent = logPaused ? "dijeda" : "live · polling tiap 2 detik";
+}
+
 function loadAdminThreads() {
   if (adminThreadsUnsub) adminThreadsUnsub();
   const list = document.getElementById("threadList");
@@ -1245,6 +1594,7 @@ const VIEW_PATHS = {
   register: "/daftar-jadibot",
   list: "/bot-aktif",
   manage: "/kelola-bot",
+  mystats: "/akun-saya",
   ticket: "/kirim-tiket",
   chat: "/chat-admin",
   adminpanel: "/admin-panel",
@@ -1253,7 +1603,7 @@ const VIEW_PATHS = {
 };
 
 // Halaman yang WAJIB login. Publik: landing, list (Bot Aktif), login, admin (bantuan/FAQ).
-const PROTECTED_VIEWS = ["dashboard", "register", "manage", "ticket", "chat", "adminpanel"];
+const PROTECTED_VIEWS = ["dashboard", "register", "manage", "mystats", "ticket", "chat", "adminpanel"];
 
 function pathToView(pathname) {
   const found = Object.entries(VIEW_PATHS).find(([, p]) => p === pathname);
@@ -1272,6 +1622,7 @@ function navigate(viewName, opts = {}) {
   document.getElementById(`view-${viewName}`)?.classList.add('active');
   document.querySelectorAll('.drawer a').forEach(a => a.classList.remove('active'));
   if (listTimer) { clearInterval(listTimer); listTimer = null; }
+  if (viewName !== 'adminpanel') stopLogPolling();
   if (viewName === 'list') { loadList(); listTimer = setInterval(loadList, 5000); }
   if (viewName === 'dashboard') {
     document.getElementById('dashHello').textContent = `Halo, ${currentUser?.displayName || 'Member'} 👋`;
