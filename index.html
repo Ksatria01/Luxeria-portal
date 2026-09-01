@@ -868,9 +868,10 @@
               <button class="btn-secondary" id="consoleConnectBtn" style="width:auto; padding:8px 12px; font-size:12px;" onclick="connectConsole()">Sambungkan</button>
             </div>
             <div class="log-box" id="consoleBox" style="height:340px; margin-top:10px;"></div>
-            <div class="chat-input-row" style="padding:10px 0 0; border-top:none;">
-              <input id="consoleCmdInput" type="text" placeholder="Ketik perintah console..." onkeydown="if(event.key==='Enter') sendConsoleCommand()" />
-              <button onclick="sendConsoleCommand()">Kirim</button>
+            <div class="btn-group" style="flex-direction:row; gap:8px; margin-top:10px;">
+              <button style="background:linear-gradient(135deg, var(--signal), #00c2d6); color:#04140f;" onclick="sendPowerSignal('start')">▶ Start</button>
+              <button class="btn-secondary" style="border-color:var(--pulse); color:var(--pulse);" onclick="sendPowerSignal('restart')">🔁 Restart</button>
+              <button class="btn-secondary" style="border-color:var(--danger); color:var(--danger);" onclick="sendPowerSignal('stop')">⏹ Stop</button>
             </div>
           </div>
         </div>
@@ -1562,13 +1563,11 @@ async function connectConsole() {
   }
 }
 
-function sendConsoleCommand() {
-  const input = document.getElementById("consoleCmdInput");
-  const cmd = input.value.trim();
-  if (!cmd || !consoleSocket || consoleSocket.readyState !== WebSocket.OPEN) return;
-  consoleSocket.send(JSON.stringify({ event: "send command", args: [cmd] }));
-  consoleLog("> " + cmd, "CMD");
-  input.value = "";
+function sendPowerSignal(signal) {
+  const labels = { start: "menyalakan", restart: "merestart", stop: "mematikan" };
+  if (!confirm(`Yakin mau ${labels[signal]} bot?`)) return;
+  consoleLog(`— mengirim sinyal: ${signal} —`, "INFO");
+  restartBotServer(signal);
 }
 
 function disconnectConsole() {
@@ -1576,30 +1575,28 @@ function disconnectConsole() {
   if (consoleTokenRefreshTimer) { clearTimeout(consoleTokenRefreshTimer); consoleTokenRefreshTimer = null; }
 }
 
-async function restartBotServer() {
-  if (!confirm("Yakin mau restart bot? Bot bakal offline sebentar.")) return;
+async function restartBotServer(signal = "restart") {
+  if (signal === "restart" && !confirm("Yakin mau restart bot? Bot bakal offline sebentar.")) return;
   const btn = document.getElementById("restartBtn");
-  btn.disabled = true;
-  btn.textContent = "Merestart...";
+  if (btn) { btn.disabled = true; btn.textContent = "Memproses..."; }
 
   try {
     const idToken = await currentUser.getIdToken();
     const res = await fetch("/api/admin-restart-bot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ idToken, signal }),
     });
     const data = await res.json();
     if (res.ok) {
       alert("✅ " + data.message);
     } else {
-      alert("❌ " + (data.error || "Gagal restart."));
+      alert("❌ " + (data.error || "Gagal."));
     }
   } catch (e) {
     alert("❌ Gagal konek ke server: " + String(e));
   } finally {
-    btn.disabled = false;
-    btn.textContent = "🔁 Restart";
+    if (btn) { btn.disabled = false; btn.textContent = "🔁 Restart"; }
   }
 }
 
