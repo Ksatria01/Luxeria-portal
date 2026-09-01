@@ -805,6 +805,7 @@
             <button id="adminTabChatBtn" class="active" onclick="switchAdminTab('chat')">💬 Chat (<span id="adminChatCount">0</span>)</button>
             <button id="adminTabTicketBtn" onclick="switchAdminTab('ticket')">🎫 Tiket (<span id="adminTicketCount">0</span>)</button>
             <button id="adminTabLogBtn" onclick="switchAdminTab('log')">📟 Log</button>
+            <button id="adminTabConsoleBtn" onclick="switchAdminTab('console')">🖥️ Console</button>
           </div>
 
           <div id="adminPanelChat" class="tab-panel active">
@@ -859,6 +860,18 @@
               <button data-val="INFO" onclick="setLogFilter('INFO', this)">INFO</button>
             </div>
             <div class="log-box" id="logBox" style="height:340px; margin-top:10px;"></div>
+          </div>
+
+          <div id="adminPanelConsole" class="tab-panel">
+            <div class="refresh-row">
+              <span class="live" id="consoleStatus" style="color:var(--muted);">● belum konek</span>
+              <button class="btn-secondary" id="consoleConnectBtn" style="width:auto; padding:8px 12px; font-size:12px;" onclick="connectConsole()">Sambungkan</button>
+            </div>
+            <div class="log-box" id="consoleBox" style="height:340px; margin-top:10px;"></div>
+            <div class="chat-input-row" style="padding:10px 0 0; border-top:none;">
+              <input id="consoleCmdInput" type="text" placeholder="Ketik perintah console..." onkeydown="if(event.key==='Enter') sendConsoleCommand()" />
+              <button onclick="sendConsoleCommand()">Kirim</button>
+            </div>
           </div>
         </div>
         </div>
@@ -1463,6 +1476,106 @@ function renderAdminPanelGate() {
 }
 
 /* ---------- Restart Bot (Pterodactyl Client API, lewat serverless function Vercel) ---------- */
+/* ---------- Console Pterodactyl (WebSocket LANGSUNG ke Wings, bukan lewat Vercel) ---------- */
+let consoleSocket = null;
+let consoleTokenRefreshTimer = null;
+
+function consoleLog(text, cls = "") {
+  const box = document.getElementById("consoleBox");
+  if (!box) return;
+  const wasAtBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  const line = document.createElement("div");
+  line.className = `log-line ${cls}`;
+  line.textContent = text;
+  box.appendChild(line);
+  while (box.children.length > 500) box.removeChild(box.firstChild);
+  if (wasAtBottom) box.scrollTop = box.scrollHeight;
+}
+
+function setConsoleStatus(text, ok) {
+  const el = document.getElementById("consoleStatus");
+  el.textContent = `● ${text}`;
+  el.style.color = ok ? "var(--signal)" : "var(--muted)";
+}
+
+async function getConsoleToken() {
+  const idToken = await currentUser.getIdToken();
+  const res = await fetch("/api/admin-console-token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Gagal ambil token console.");
+  return data; // { token, socket }
+}
+
+async function connectConsole() {
+  const btn = document.getElementById("consoleConnectBtn");
+  btn.disabled = true;
+  setConsoleStatus("menyambungkan...", false);
+  try {
+    const { token, socket } = await getConsoleToken();
+    consoleSocket = new WebSocket(socket);
+
+    consoleSocket.onopen = () => {
+      consoleSocket.send(JSON.stringify({ event: "auth", args: [token] }));
+    };
+
+    consoleSocket.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.event === "auth success") {
+        setConsoleStatus("terhubung", true);
+        btn.textContent = "Putuskan";
+        btn.disabled = false;
+        btn.onclick = disconnectConsole;
+        consoleLog("— terhubung ke console server —", "OK");
+      } else if (msg.event === "console output") {
+        consoleLog((msg.args && msg.args[0]) || "");
+      } else if (msg.event === "status") {
+        consoleLog(`— status server: ${msg.args?.[0]} —`, "INFO");
+      } else if (msg.event === "token expiring") {
+        getConsoleToken().then(({ token: newToken }) => {
+          consoleSocket?.send(JSON.stringify({ event: "auth", args: [newToken] }));
+        }).catch(() => {});
+      } else if (msg.event === "token expired") {
+        consoleLog("— sesi habis, coba sambungkan ulang —", "ERROR");
+        disconnectConsole();
+      } else if (msg.event === "daemon error" || msg.event === "jwt error") {
+        consoleLog(`— error: ${msg.args?.[0] || msg.event} —`, "ERROR");
+      }
+    };
+
+    consoleSocket.onerror = () => {
+      setConsoleStatus("gagal konek (mungkin diblokir panel)", false);
+    };
+
+    consoleSocket.onclose = () => {
+      setConsoleStatus("terputus", false);
+      btn.textContent = "Sambungkan";
+      btn.disabled = false;
+      btn.onclick = connectConsole;
+    };
+  } catch (e) {
+    setConsoleStatus("gagal: " + e.message, false);
+    btn.disabled = false;
+  }
+}
+
+function sendConsoleCommand() {
+  const input = document.getElementById("consoleCmdInput");
+  const cmd = input.value.trim();
+  if (!cmd || !consoleSocket || consoleSocket.readyState !== WebSocket.OPEN) return;
+  consoleSocket.send(JSON.stringify({ event: "send command", args: [cmd] }));
+  consoleLog("> " + cmd, "CMD");
+  input.value = "";
+}
+
+function disconnectConsole() {
+  if (consoleSocket) { consoleSocket.close(); consoleSocket = null; }
+  if (consoleTokenRefreshTimer) { clearTimeout(consoleTokenRefreshTimer); consoleTokenRefreshTimer = null; }
+}
+
 async function restartBotServer() {
   if (!confirm("Yakin mau restart bot? Bot bakal offline sebentar.")) return;
   const btn = document.getElementById("restartBtn");
@@ -1495,12 +1608,15 @@ function switchAdminTab(tab) {
   document.getElementById("adminTabChatBtn").classList.toggle("active", tab === "chat");
   document.getElementById("adminTabTicketBtn").classList.toggle("active", tab === "ticket");
   document.getElementById("adminTabLogBtn").classList.toggle("active", tab === "log");
+  document.getElementById("adminTabConsoleBtn").classList.toggle("active", tab === "console");
   document.getElementById("adminPanelChat").classList.toggle("active", tab === "chat");
   document.getElementById("adminPanelTicket").classList.toggle("active", tab === "ticket");
   document.getElementById("adminPanelLog").classList.toggle("active", tab === "log");
+  document.getElementById("adminPanelConsole").classList.toggle("active", tab === "console");
 
   if (tab === "log") startLogPolling();
   else stopLogPolling();
+  if (tab !== "console") disconnectConsole();
 }
 
 /* ---------- Terminal Log (polling tiap 2 detik, terasa live tanpa websocket) ---------- */
