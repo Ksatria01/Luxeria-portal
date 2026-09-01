@@ -796,6 +796,11 @@
         </div>
 
         <div id="adminBody" style="display:none;">
+          <div class="setting-row" style="margin-bottom:16px; border:1px solid var(--edge); border-radius:12px; padding:14px;">
+            <div class="stxt"><b>Server Bot</b><span>Kalau bot nge-hang / gak respon, restart dari sini</span></div>
+            <button id="restartBtn" class="btn-secondary" style="width:auto; padding:9px 16px; font-size:12px; border-color:var(--danger); color:var(--danger);" onclick="restartBotServer()">🔁 Restart</button>
+          </div>
+
           <div class="tab-switch">
             <button id="adminTabChatBtn" class="active" onclick="switchAdminTab('chat')">💬 Chat (<span id="adminChatCount">0</span>)</button>
             <button id="adminTabTicketBtn" onclick="switchAdminTab('ticket')">🎫 Tiket (<span id="adminTicketCount">0</span>)</button>
@@ -1455,6 +1460,34 @@ function renderAdminPanelGate() {
   gate.style.display = allowed ? "none" : "block";
   body.style.display = allowed ? "block" : "none";
   if (allowed) loadAdminThreads();
+}
+
+/* ---------- Restart Bot (Pterodactyl Client API, lewat serverless function Vercel) ---------- */
+async function restartBotServer() {
+  if (!confirm("Yakin mau restart bot? Bot bakal offline sebentar.")) return;
+  const btn = document.getElementById("restartBtn");
+  btn.disabled = true;
+  btn.textContent = "Merestart...";
+
+  try {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch("/api/admin-restart-bot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert("✅ " + data.message);
+    } else {
+      alert("❌ " + (data.error || "Gagal restart."));
+    }
+  } catch (e) {
+    alert("❌ Gagal konek ke server: " + String(e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔁 Restart";
+  }
 }
 
 /* ---------- Switch tab dalam Admin Panel (Chat / Tiket / Log) ---------- */
