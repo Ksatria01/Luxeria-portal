@@ -14,6 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <!-- EmailJS (kirim tiket ke email admin tanpa backend) -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<!-- anime.js (animasi ringan: angka statistik, transisi kartu) -->
+<script src="https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js"></script>
 <style>
   :root {
     --void: #06070b;
@@ -328,6 +330,17 @@
   .faq-item.open .faq-a { max-height: 200px; }
   .faq-a p { margin: 0; padding: 0 16px 14px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
 
+  /* ---------- Grup Official ---------- */
+  .group-card {
+    display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px;
+    background: var(--panel-hi); border: 1px solid var(--edge); margin-bottom: 10px;
+  }
+  .group-card .gic { width: 40px; height: 40px; border-radius: 10px; background: var(--signal-dim); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .group-card .ginfo { flex: 1; min-width: 0; }
+  .group-card .ginfo b { display:block; font-size:13.5px; color:var(--ink); }
+  .group-card .gjoin { width:auto; padding:8px 16px; font-size:12px; flex-shrink:0; text-decoration:none; }
+  .group-card .gdel { background:none; border:none; color:var(--danger); font-size:11px; width:auto; padding:4px; margin-top:4px; }
+
   /* ---------- Kelola Bot (settings toggle) ---------- */
   .setting-row {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -429,6 +442,7 @@
     <hr>
     <a href="/daftar-jadibot" onclick="event.preventDefault(); navigate('register'); toggleDrawer();">📲 Daftar Jadibot</a>
     <a href="/bot-aktif" onclick="event.preventDefault(); navigate('list'); toggleDrawer();">📡 Bot Aktif</a>
+    <a href="/grup-official" onclick="event.preventDefault(); navigate('groups'); toggleDrawer();">👥 Grup Official</a>
     <a href="/kelola-bot" onclick="event.preventDefault(); navigate('manage'); toggleDrawer();">⚙️ Kelola Bot</a>
     <a href="/kirim-tiket" onclick="event.preventDefault(); navigate('ticket'); toggleDrawer();">🎫 Kirim Tiket</a>
     <a href="/chat-admin" onclick="event.preventDefault(); navigate('chat'); toggleDrawer();">💬 Chat Admin</a>
@@ -550,6 +564,26 @@
       </div>
     </div>
 
+    <!-- GRUP OFFICIAL (publik, data sama dengan command .ofc di WhatsApp) -->
+    <div id="view-groups" class="view">
+      <div class="card">
+        <div class="eyebrow">GABUNG KOMUNITAS</div>
+        <h1>Grup Official</h1>
+        <p class="sub">Grup WhatsApp resmi Luxeria — info update, event, dan diskusi bareng member lain.</p>
+        <div id="groupsBox"><div class="empty-state">Memuat data…</div></div>
+
+        <div id="groupsAdminAdd" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid var(--edge);">
+          <div class="stxt" style="margin-bottom:10px;"><b>Tambah Grup (Admin)</b></div>
+          <label for="og-name">Nama Grup</label>
+          <input id="og-name" type="text" placeholder="Luxeria Community" />
+          <label for="og-link">Link Undangan</label>
+          <input id="og-link" type="text" placeholder="https://chat.whatsapp.com/xxxxxx" />
+          <button onclick="addOfficialGroup()">Tambah</button>
+          <div id="groupsAdminResult" class="result"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- LOGIN (Firebase: Google + Email/Password) -->
     <div id="view-login" class="view">
       <div class="card">
@@ -665,6 +699,9 @@
           </div>
           <div class="feat-box" style="cursor:pointer;" onclick="navigate('chat')">
             <div class="fic">💬</div><h3>Chat Admin</h3><p>Ngobrol langsung</p>
+          </div>
+          <div class="feat-box" style="cursor:pointer;" onclick="navigate('groups')">
+            <div class="fic">👥</div><h3>Grup Official</h3><p>Gabung komunitas</p>
           </div>
         </div>
 
@@ -1142,15 +1179,22 @@ function loadMyTickets() {
   const box = document.getElementById("myTicketsBox");
   if (!box || !currentUser) return;
   if (myTicketsUnsub) myTicketsUnsub();
+  // Sengaja gak pakai .orderBy() bareng .where() di query Firestore - kombinasi itu
+  // butuh composite index yang belum tentu ada, dan kalau belum ada, query gagal
+  // diam-diam (loading nyangkut selamanya). Urutan sort dilakukan di JS aja.
   myTicketsUnsub = dbFire.collection("tickets")
     .where("uid", "==", currentUser.uid)
-    .orderBy("updatedAt", "desc")
     .onSnapshot((snap) => {
       if (snap.empty) {
         box.innerHTML = `<div class="empty-state">Belum ada tiket.</div>`;
         return;
       }
-      box.innerHTML = snap.docs.map((d) => {
+      const docs = snap.docs.slice().sort((a, b) => {
+        const ta = a.data().updatedAt?.toMillis ? a.data().updatedAt.toMillis() : 0;
+        const tb = b.data().updatedAt?.toMillis ? b.data().updatedAt.toMillis() : 0;
+        return tb - ta;
+      });
+      box.innerHTML = docs.map((d) => {
         const t = d.data();
         const date = t.updatedAt?.toDate ? t.updatedAt.toDate().toLocaleString("id-ID") : "-";
         return `<div class="tk-row" onclick="openTicketDetail('${d.id}')">
@@ -1162,6 +1206,8 @@ function loadMyTickets() {
           <div class="tk-date">diperbarui ${date}</div>
         </div>`;
       }).join("");
+    }, (err) => {
+      box.innerHTML = `<div class="empty-state">Gagal muat tiket: ${escapeHtml(err.message)}</div>`;
     });
 }
 
@@ -1266,6 +1312,7 @@ async function loadMyBots() {
       statCard(online, "ONLINE") +
       statCard(modePublic, "MODE PUBLIC") +
       statCard(modeSelf, "MODE SELF");
+    animateStatCards(statsBox);
 
     box.innerHTML = results.map((r) => `
       <div class="bot-row" style="cursor:pointer;" onclick="goManageNumber('${r.number}')">
@@ -1278,8 +1325,112 @@ async function loadMyBots() {
   }
 }
 
+/* ==========================================================================
+   Grup Official - publik buat lihat+gabung, admin bisa tambah/hapus.
+   ========================================================================== */
+async function loadOfficialGroups() {
+  const box = document.getElementById("groupsBox");
+  document.getElementById("groupsAdminAdd").style.display = isAdminUser(currentUser) ? "block" : "none";
+  try {
+    const res = await fetch(`${API_BASE}/api/official-groups`, { cache: "no-store" });
+    const groups = await res.json();
+    if (!Array.isArray(groups) || groups.length === 0) {
+      box.innerHTML = `<div class="empty-state">Belum ada grup official yang terdaftar.</div>`;
+      return;
+    }
+    box.innerHTML = groups.map((g, i) => `
+      <div class="group-card">
+        <div class="gic">👥</div>
+        <div class="ginfo">
+          <b>${escapeHtml(g.name)}</b>
+          ${isAdminUser(currentUser) ? `<button class="gdel" onclick="removeOfficialGroup(${i})">Hapus</button>` : ""}
+        </div>
+        <a class="gjoin btn-link" style="background:#25D366; color:#04140f;" href="${g.link}" target="_blank">Gabung</a>
+      </div>
+    `).join("");
+  } catch (e) {
+    box.innerHTML = `<div class="empty-state">Gagal ambil data grup.</div>`;
+  }
+}
+
+async function addOfficialGroup() {
+  const name = document.getElementById("og-name").value.trim();
+  const link = document.getElementById("og-link").value.trim();
+  const resultEl = document.getElementById("groupsAdminResult");
+  if (!name || !link) {
+    resultEl.className = "result show err";
+    resultEl.textContent = "Isi nama dan link dulu ya.";
+    return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/api/official-groups`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, link }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      resultEl.className = "result show err";
+      resultEl.textContent = data.error || "Gagal nambah grup.";
+      return;
+    }
+    resultEl.className = "result show ok";
+    resultEl.textContent = "Grup ditambahin ✓";
+    document.getElementById("og-name").value = "";
+    document.getElementById("og-link").value = "";
+    loadOfficialGroups();
+  } catch (e) {
+    resultEl.className = "result show err";
+    resultEl.textContent = "Gagal konek ke server.";
+  }
+}
+
+async function removeOfficialGroup(index) {
+  if (!confirm("Hapus grup ini?")) return;
+  try {
+    await fetch(`${API_BASE}/api/official-groups/${index}`, { method: "DELETE" });
+    loadOfficialGroups();
+  } catch (e) { /* diam */ }
+}
+
+/* ---------- Animasi ringan (anime.js) ---------- */
+function animateCount(el, target) {
+  if (!el) return;
+  if (!window.anime) { el.textContent = target; return; }
+  const obj = { val: 0 };
+  anime({
+    targets: obj,
+    val: target,
+    duration: 900,
+    easing: "easeOutExpo",
+    round: 1,
+    update: () => { el.textContent = Math.round(obj.val); },
+  });
+}
+
+function animateCardsIn(selector) {
+  if (!window.anime) return;
+  const els = document.querySelectorAll(selector);
+  if (!els.length) return;
+  anime({
+    targets: els,
+    opacity: [0, 1],
+    translateY: [16, 0],
+    delay: anime.stagger(60),
+    duration: 500,
+    easing: "easeOutQuad",
+  });
+}
+
+function animateStatCards(container) {
+  if (!container) return;
+  container.querySelectorAll(".num[data-target]").forEach((el) => {
+    animateCount(el, parseInt(el.dataset.target, 10) || 0);
+  });
+}
+
 function statCard(num, label) {
-  return `<div class="stat-box" style="padding:14px 8px;"><div class="num" style="font-size:20px;">${num}</div><div class="lbl" style="font-size:9.5px;">${label}</div></div>`;
+  return `<div class="stat-box" style="padding:14px 8px;"><div class="num" style="font-size:20px;" data-target="${num}">0</div><div class="lbl" style="font-size:9.5px;">${label}</div></div>`;
 }
 
 function goManageNumber(number) {
@@ -1473,7 +1624,7 @@ function renderAdminPanelGate() {
   const allowed = isAdminUser(currentUser);
   gate.style.display = allowed ? "none" : "block";
   body.style.display = allowed ? "block" : "none";
-  if (allowed) loadAdminThreads();
+  if (allowed) { loadAdminThreads(); loadAdminTickets(); }
 }
 
 /* ---------- Restart Bot (Pterodactyl Client API, lewat serverless function Vercel) ---------- */
@@ -1689,6 +1840,7 @@ function loadAdminThreads() {
   const list = document.getElementById("threadList");
   adminThreadsUnsub = dbFire.collection("chats").orderBy("lastTs", "desc")
     .onSnapshot((snap) => {
+      document.getElementById("adminChatCount").textContent = snap.size;
       if (snap.empty) {
         list.innerHTML = `<div class="empty-state">Belum ada chat masuk.</div>`;
         return;
@@ -1699,7 +1851,100 @@ function loadAdminThreads() {
           <div class="tinfo"><b>${escapeHtml(c.name || 'Member')}</b><span>${c.lastSender === 'admin' ? 'Kamu: ' : ''}${escapeHtml(c.lastMessage || '')}</span></div>
         </div>`;
       }).join("");
+    }, (err) => {
+      list.innerHTML = `<div class="empty-state">Gagal muat chat: ${escapeHtml(err.message)}</div>`;
     });
+}
+
+/* ---------- Tiket (Admin) ---------- */
+let adminTicketsUnsub = null;
+let adminActiveTicketId = null;
+let adminTicketMsgsUnsub = null;
+
+function loadAdminTickets() {
+  if (adminTicketsUnsub) adminTicketsUnsub();
+  const list = document.getElementById("adminTicketList");
+  adminTicketsUnsub = dbFire.collection("tickets").orderBy("updatedAt", "desc")
+    .onSnapshot((snap) => {
+      document.getElementById("adminTicketCount").textContent = snap.size;
+      if (snap.empty) {
+        list.innerHTML = `<div class="empty-state">Belum ada tiket masuk.</div>`;
+        return;
+      }
+      list.innerHTML = snap.docs.map((d) => {
+        const t = d.data();
+        return `<div class="thread-row" onclick="openAdminTicket('${d.id}')">
+          <div class="tinfo">
+            <b>${escapeHtml(t.title || d.id)}</b>
+            <span>${escapeHtml(t.memberName || 'Member')} · ${escapeHtml(t.category || '')}</span>
+          </div>
+          <span class="tk-status ${t.status}" style="flex-shrink:0;">${TICKET_STATUS_LABEL[t.status] || t.status}</span>
+        </div>`;
+      }).join("");
+    }, (err) => {
+      list.innerHTML = `<div class="empty-state">Gagal muat tiket: ${escapeHtml(err.message)}</div>`;
+    });
+}
+
+function openAdminTicket(code) {
+  adminActiveTicketId = code;
+  document.getElementById("adminTicketList").style.display = "none";
+  document.getElementById("adminTicketArea").style.display = "block";
+
+  dbFire.collection("tickets").doc(code).get().then((doc) => {
+    const t = doc.data();
+    if (!t) return;
+    document.getElementById("atk-code").textContent = code;
+    document.getElementById("atk-title").textContent = t.title || "";
+    document.getElementById("atk-meta").textContent = `${escapeHtml(t.memberName || 'Member')} · ${escapeHtml(t.category || '')}`;
+    document.querySelectorAll("#atk-status-seg button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.val === t.status);
+    });
+  });
+
+  if (adminTicketMsgsUnsub) adminTicketMsgsUnsub();
+  const msgsEl = document.getElementById("atkMsgs");
+  adminTicketMsgsUnsub = dbFire.collection("tickets").doc(code).collection("replies")
+    .orderBy("ts", "asc")
+    .onSnapshot((snap) => {
+      msgsEl.innerHTML = snap.docs.map((d) => {
+        const m = d.data();
+        return `<div class="chat-bubble ${m.sender === 'admin' ? 'me' : 'them'}">${m.sender === 'member' ? `<span class="who">PELAPOR</span>` : ''}${escapeHtml(m.text)}</div>`;
+      }).join("");
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    });
+}
+
+function closeAdminTicket() {
+  document.getElementById("adminTicketList").style.display = "block";
+  document.getElementById("adminTicketArea").style.display = "none";
+  if (adminTicketMsgsUnsub) adminTicketMsgsUnsub();
+  adminActiveTicketId = null;
+}
+
+async function setTicketStatus(status, btnEl) {
+  if (!adminActiveTicketId) return;
+  document.querySelectorAll("#atk-status-seg button").forEach((b) => b.classList.remove("active"));
+  btnEl.classList.add("active");
+  await dbFire.collection("tickets").doc(adminActiveTicketId).set({
+    status,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
+async function sendAdminTicketReply() {
+  const input = document.getElementById("atkInput");
+  const text = input.value.trim();
+  if (!text || !adminActiveTicketId) return;
+  input.value = "";
+
+  const ref = dbFire.collection("tickets").doc(adminActiveTicketId);
+  await ref.set({ updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  await ref.collection("replies").add({
+    sender: "admin",
+    text,
+    ts: firebase.firestore.FieldValue.serverTimestamp(),
+  });
 }
 
 function openAdminThread(chatId, name) {
@@ -1752,6 +1997,7 @@ const VIEW_PATHS = {
   dashboard: "/dashboard",
   register: "/daftar-jadibot",
   list: "/bot-aktif",
+  groups: "/grup-official",
   manage: "/kelola-bot",
   mystats: "/akun-saya",
   ticket: "/kirim-tiket",
@@ -1783,9 +2029,13 @@ function navigate(viewName, opts = {}) {
   if (listTimer) { clearInterval(listTimer); listTimer = null; }
   if (viewName !== 'adminpanel') stopLogPolling();
   if (viewName === 'list') { loadList(); listTimer = setInterval(loadList, 5000); }
+  if (viewName === 'groups') loadOfficialGroups();
+  if (viewName === 'landing') {
+    setTimeout(() => { animateCardsIn('.feature-grid .feat-box'); animateCardsIn('.stats-grid .stat-box'); }, 50);
+  }
   if (viewName === 'dashboard') {
     document.getElementById('dashHello').textContent = `Halo, ${currentUser?.displayName || 'Member'} 👋`;
-    document.getElementById('dashAdminCard').style.display = isAdminUser(currentUser) ? 'block' : 'none';
+document.getElementById('dashAdminCard').style.display = isAdminUser(currentUser) ? 'block' : 'none';
     loadMyBots();
   }
 
@@ -1826,9 +2076,11 @@ async function loadLandingStats() {
     const total = Array.isArray(data) ? data.length : 0;
     const online = Array.isArray(data) ? data.filter(j => j.connected).length : 0;
     grid.innerHTML = `
-      <div class="stat-box"><div class="num">${total}</div><div class="lbl">BOT TERDAFTAR</div></div>
-      <div class="stat-box"><div class="num">${online}</div><div class="lbl"><span class="dot-live"></span>BOT ONLINE</div></div>
+      <div class="stat-box"><div class="num" id="statTotalNum">0</div><div class="lbl">BOT TERDAFTAR</div></div>
+      <div class="stat-box"><div class="num" id="statOnlineNum">0</div><div class="lbl"><span class="dot-live"></span>BOT ONLINE</div></div>
     `;
+    animateCount(document.getElementById('statTotalNum'), total);
+    animateCount(document.getElementById('statOnlineNum'), online);
   } catch (e) {
     grid.innerHTML = `
       <div class="stat-box"><div class="num">-</div><div class="lbl">BOT TERDAFTAR</div></div>
@@ -1913,9 +2165,9 @@ function updateListSummary(data) {
   const online = data.filter(j => j.connected).length;
   const offline = total - online;
   const nums = box.querySelectorAll(".num");
-  nums[0].textContent = total;
-  nums[1].textContent = online;
-  nums[2].textContent = offline;
+  animateCount(nums[0], total);
+  animateCount(nums[1], online);
+  animateCount(nums[2], offline);
 }
 
 async function loadList() {
