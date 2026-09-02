@@ -101,11 +101,11 @@
 
   /* ---------- Drawer ---------- */
   .drawer {
-    position: fixed; top: 0; right: -290px; width: 280px; height: 100%;
+    position: fixed; top: 0; right: 0; width: 280px; height: 100%;
     background: rgba(9,11,17,0.97); backdrop-filter: blur(18px);
     border-left: 1px solid var(--edge); z-index: 100; padding: 22px;
     display: flex; flex-direction: column; gap: 6px; box-shadow: -20px 0 40px rgba(0,0,0,0.5);
-    transition: right 0.3s cubic-bezier(0.4,0,0.2,1);
+    transform: translateX(105%);
   }
   .drawer.open { right: 0; }
   .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
@@ -125,8 +125,7 @@
   /* ---------- Layout ---------- */
   main { position: relative; z-index: 1; flex: 1; display: flex; align-items: center; justify-content: center; padding: 96px 18px 40px; }
   .view { display: none; width: 100%; max-width: 460px; }
-  .view.active { display: block; animation: fadeIn 0.35s cubic-bezier(0.4,0,0.2,1); }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .view.active { display: block; }
 
   .card {
     background: var(--panel); border: 1px solid var(--edge);
@@ -324,10 +323,9 @@
   .cmd-badge { text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--signal); margin-top: 6px; }
   .faq-item { border: 1px solid var(--edge); border-radius: 12px; margin-bottom: 8px; overflow: hidden; background: var(--panel); }
   .faq-q { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--ink); }
-  .faq-q .plus { color: var(--signal); font-family: var(--font-mono); transition: transform 0.2s; }
-  .faq-item.open .faq-q .plus { transform: rotate(45deg); }
-  .faq-a { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
-  .faq-item.open .faq-a { max-height: 200px; }
+  .faq-q .plus { color: var(--signal); font-family: var(--font-mono); }
+  .faq-a { max-height: 0; overflow: hidden; }
+  .faq-item.open .faq-a { max-height: none; }
   .faq-a p { margin: 0; padding: 0 16px 14px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
 
   /* ---------- Grup Official ---------- */
@@ -1034,6 +1032,7 @@ function showAuthResult(type, msg) {
   const el = document.getElementById("authResult");
   el.className = `result show ${type}`;
   el.textContent = msg;
+  popIn(el);
 }
 
 function goAfterAuth() {
@@ -1394,6 +1393,18 @@ async function removeOfficialGroup(index) {
 }
 
 /* ---------- Animasi ringan (anime.js) ---------- */
+function popIn(el) {
+  if (!el || !window.anime) return;
+  anime({
+    targets: el,
+    opacity: [0, 1],
+    scale: [0.92, 1],
+    translateY: [-6, 0],
+    duration: 380,
+    easing: "easeOutBack",
+  });
+}
+
 function animateCount(el, target) {
   if (!el) return;
   if (!window.anime) { el.textContent = target; return; }
@@ -1557,6 +1568,7 @@ function showManageResult(type, msg) {
   const el = document.getElementById("manageResult");
   el.className = `result show ${type}`;
   el.textContent = msg;
+  popIn(el);
   if (type === "ok") setTimeout(() => { el.className = "result"; }, 2000);
 }
 
@@ -2024,20 +2036,23 @@ function navigate(viewName, opts = {}) {
   }
 
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById(`view-${viewName}`)?.classList.add('active');
+  const newView = document.getElementById(`view-${viewName}`);
+  newView?.classList.add('active');
   document.querySelectorAll('.drawer a').forEach(a => a.classList.remove('active'));
   if (listTimer) { clearInterval(listTimer); listTimer = null; }
   if (viewName !== 'adminpanel') stopLogPolling();
   if (viewName === 'list') { loadList(); listTimer = setInterval(loadList, 5000); }
   if (viewName === 'groups') loadOfficialGroups();
   if (viewName === 'landing') {
-    setTimeout(() => { animateCardsIn('.feature-grid .feat-box'); animateCardsIn('.stats-grid .stat-box'); }, 50);
+    setTimeout(() => { animateCardsIn('.feature-grid .feat-box'); animateCardsIn('.stats-grid .stat-box'); }, 260);
   }
   if (viewName === 'dashboard') {
     document.getElementById('dashHello').textContent = `Halo, ${currentUser?.displayName || 'Member'} 👋`;
-document.getElementById('dashAdminCard').style.display = isAdminUser(currentUser) ? 'block' : 'none';
+    document.getElementById('dashAdminCard').style.display = isAdminUser(currentUser) ? 'block' : 'none';
     loadMyBots();
   }
+
+  animateViewEnter(newView);
 
   const path = VIEW_PATHS[viewName] || "/";
   if (opts.pushState !== false && location.pathname !== path) {
@@ -2046,14 +2061,85 @@ document.getElementById('dashAdminCard').style.display = isAdminUser(currentUser
   window.scrollTo(0, 0);
 }
 
+function animateViewEnter(viewEl) {
+  if (!viewEl) return;
+  if (!window.anime) { viewEl.style.opacity = 1; return; }
+
+  const card = viewEl.querySelector(':scope > .card');
+  anime.set(viewEl, { opacity: 1 });
+  if (card) {
+    anime.set(card, { opacity: 0, translateY: 34, scale: 0.97 });
+    anime({
+      targets: card,
+      opacity: [0, 1],
+      translateY: [34, 0],
+      scale: [0.97, 1],
+      duration: 620,
+      easing: "easeOutExpo",
+    });
+  }
+
+  // Elemen anak (baris/kartu di dalam view) nyusul kebanjiri satu-satu
+  const children = viewEl.querySelectorAll(
+    '.stat-box, .feat-box, .bot-row, .group-card, .thread-row, .faq-item, .setting-row, .tk-row, .user-chip, .steps li'
+  );
+  if (children.length) {
+    anime.set(children, { opacity: 0, translateX: -12 });
+    anime({
+      targets: children,
+      opacity: [0, 1],
+      translateX: [-12, 0],
+      delay: anime.stagger(45, { start: 260 }),
+      duration: 420,
+      easing: "easeOutQuad",
+    });
+  }
+}
+
 window.addEventListener("popstate", (e) => {
   const viewName = (e.state && e.state.view) || pathToView(location.pathname);
   navigate(viewName, { pushState: false });
 });
 
+/* Tombol: feedback ketuk (scale pulse) di semua elemen <button> */
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn || !window.anime) return;
+  anime({
+    targets: btn,
+    scale: [1, 0.94, 1],
+    duration: 260,
+    easing: "easeOutQuad",
+  });
+});
+
+let drawerOpen = false;
 function toggleDrawer() {
-  document.getElementById('drawer').classList.toggle('open');
-  document.getElementById('overlay').classList.toggle('show');
+  const drawer = document.getElementById('drawer');
+  const overlay = document.getElementById('overlay');
+  drawerOpen = !drawerOpen;
+
+  if (!window.anime) {
+    drawer.classList.toggle('open', drawerOpen);
+    overlay.classList.toggle('show', drawerOpen);
+    return;
+  }
+
+  if (drawerOpen) {
+    overlay.classList.add('show');
+    anime({ targets: overlay, opacity: [0, 1], duration: 250, easing: "linear" });
+    anime({ targets: drawer, translateX: ["105%", "0%"], duration: 420, easing: "easeOutExpo" });
+    anime.set(drawer.querySelectorAll('a, .user-chip'), { opacity: 0, translateX: 16 });
+    anime({
+      targets: drawer.querySelectorAll('a, .user-chip'),
+      opacity: [0, 1], translateX: [16, 0],
+      delay: anime.stagger(35, { start: 160 }),
+      duration: 350, easing: "easeOutQuad",
+    });
+  } else {
+    anime({ targets: overlay, opacity: [1, 0], duration: 250, easing: "linear", complete: () => overlay.classList.remove('show') });
+    anime({ targets: drawer, translateX: ["0%", "105%"], duration: 350, easing: "easeInExpo" });
+  }
 }
 
 function goToSection(id) {
@@ -2064,7 +2150,26 @@ function goToSection(id) {
 }
 
 function toggleFaq(headerEl) {
-  headerEl.parentElement.classList.toggle('open');
+  const item = headerEl.parentElement;
+  const answer = item.querySelector('.faq-a');
+  const plus = headerEl.querySelector('.plus');
+  const isOpen = item.classList.contains('open');
+
+  if (!window.anime) { item.classList.toggle('open'); return; }
+
+  if (!isOpen) {
+    item.classList.add('open');
+    const h = answer.scrollHeight;
+    anime.set(answer, { maxHeight: 0 });
+    anime({ targets: answer, maxHeight: [0, h], duration: 380, easing: "easeOutQuad" });
+    anime({ targets: plus, rotate: [0, 45], duration: 300, easing: "easeOutQuad" });
+  } else {
+    anime({
+      targets: answer, maxHeight: [answer.scrollHeight, 0], duration: 300, easing: "easeInQuad",
+      complete: () => item.classList.remove('open'),
+    });
+    anime({ targets: plus, rotate: [45, 0], duration: 250, easing: "easeOutQuad" });
+  }
 }
 
 async function loadLandingStats() {
@@ -2089,6 +2194,22 @@ async function loadLandingStats() {
   }
 }
 loadLandingStats();
+
+// Logo header "napas" pelan-pelan, biar halaman kerasa hidup walau lagi diem
+if (window.anime) {
+  anime({
+    targets: '.brand-mark',
+    scale: [1, 1.08, 1],
+    boxShadow: [
+      { value: '0 0 12px rgba(0,240,255,0.15)' },
+      { value: '0 0 22px rgba(0,240,255,0.4)' },
+      { value: '0 0 12px rgba(0,240,255,0.15)' },
+    ],
+    duration: 2600,
+    easing: 'easeInOutSine',
+    loop: true,
+  });
+}
 
 /* ---------- Registrasi + pairing (POST /api/jadibot) ---------- */
 async function daftar() {
@@ -2210,6 +2331,7 @@ function showResult(type, html) {
   const el = document.getElementById("result");
   el.className = `result show ${type}`;
   el.innerHTML = html;
+  popIn(el);
 }
 </script>
 </body>
