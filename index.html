@@ -1515,6 +1515,8 @@ async function connectConsole() {
   const btn = document.getElementById("consoleConnectBtn");
   btn.disabled = true;
   setConsoleStatus("menyambungkan...", false);
+  let authSucceeded = false;
+
   try {
     const { token, socket } = await getConsoleToken();
     consoleSocket = new WebSocket(socket);
@@ -1526,6 +1528,7 @@ async function connectConsole() {
     consoleSocket.onmessage = (ev) => {
       const msg = JSON.parse(ev.data);
       if (msg.event === "auth success") {
+        authSucceeded = true;
         setConsoleStatus("terhubung", true);
         btn.textContent = "Putuskan";
         btn.disabled = false;
@@ -1548,18 +1551,28 @@ async function connectConsole() {
     };
 
     consoleSocket.onerror = () => {
-      setConsoleStatus("gagal konek (mungkin diblokir panel)", false);
+      setConsoleStatus("gagal konek (kemungkinan diblokir panel)", false);
     };
 
-    consoleSocket.onclose = () => {
-      setConsoleStatus("terputus", false);
+    consoleSocket.onclose = (ev) => {
+      if (!authSucceeded) {
+        // Belum pernah sukses auth = ini kegagalan konek, bukan "terputus" biasa.
+        // Simpan pesan yang jelas, jangan ditimpa status default.
+        setConsoleStatus(`gagal konek (kode ${ev.code}) — kemungkinan diblokir panel`, false);
+        consoleLog(`— koneksi ditolak/gagal (close code ${ev.code}${ev.reason ? ": " + ev.reason : ""}) —`, "ERROR");
+      } else {
+        setConsoleStatus("terputus", false);
+      }
       btn.textContent = "Sambungkan";
       btn.disabled = false;
       btn.onclick = connectConsole;
+      consoleSocket = null;
     };
   } catch (e) {
     setConsoleStatus("gagal: " + e.message, false);
     btn.disabled = false;
+    btn.textContent = "Sambungkan";
+    btn.onclick = connectConsole;
   }
 }
 
